@@ -1,0 +1,27 @@
+{
+  "name": "@mariozechner/pi-remote-server",
+  "version": "0.0.1",
+  "description": "Remote control server for pi agent",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/server.ts",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "fastify": "^4.26.1",
+    "@fastify/websocket": "^9.0.0",
+    "@fastify/static": "^7.0.1",
+    "ws": "^8.16.0",
+    "chalk": "^5.3.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.19",
+    "@types/ws": "^8.5.10",
+    "@types/qrcode-terminal": "^0.12.2",
+    "typescript": "^5.3.3",
+    "tsx": "^4.7.1"
+  }
+}
