@@ -742,7 +742,7 @@ export class Editor implements Component {
 		const after = line.slice(this.state.cursorCol);
 
 		this.state.lines[this.state.cursorLine] = before + char + after;
-		this.state.cursorCol += char.length; // Fix: increment by the length of the inserted string
+		this.state.cursorCol += char.length;
 
 		if (this.onChange) {
 			this.onChange(this.getText());
