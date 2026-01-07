@@ -5,6 +5,9 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export type AgentScope = "user" | "project" | "both";
 
@@ -127,11 +130,17 @@ function findNearestProjectAgentsDir(cwd: string): string | null {
 export function discoverAgents(cwd: string, scope: AgentScope): AgentDiscoveryResult {
 	const userDir = path.join(os.homedir(), ".pi", "agent", "agents");
 	const projectAgentsDir = findNearestProjectAgentsDir(cwd);
+	const bundledAgentsDir = path.join(__dirname, "agents");
 
+	// Bundled agents (shipped with extension) are loaded as "user" scope baseline
+	const bundledAgents = loadAgentsFromDir(bundledAgentsDir, "user");
 	const userAgents = scope === "project" ? [] : loadAgentsFromDir(userDir, "user");
 	const projectAgents = scope === "user" || !projectAgentsDir ? [] : loadAgentsFromDir(projectAgentsDir, "project");
 
 	const agentMap = new Map<string, AgentConfig>();
+
+	// Bundled agents first (lowest priority - can be overridden by user or project)
+	for (const agent of bundledAgents) agentMap.set(agent.name, agent);
 
 	if (scope === "both") {
 		for (const agent of userAgents) agentMap.set(agent.name, agent);

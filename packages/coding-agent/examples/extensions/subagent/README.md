@@ -31,26 +31,30 @@ subagent/
 
 ## Installation
 
-From the repository root, symlink the files:
+### Option 1: Via settings.json (recommended)
+
+Add the extension path to your settings:
+
+```json
+{
+  "extensions": ["/path/to/pi-mono/packages/coding-agent/examples/extensions/subagent"]
+}
+```
+
+The extension **autodiscovers** bundled agents and prompts from its own `agents/` and `prompts/` subdirectories. No symlinks needed.
+
+### Option 2: Symlink to user directory
 
 ```bash
-# Symlink the extension (must be in a subdirectory with index.ts)
-mkdir -p ~/.pi/agent/extensions/subagent
-ln -sf "$(pwd)/packages/coding-agent/examples/extensions/subagent/index.ts" ~/.pi/agent/extensions/subagent/index.ts
-ln -sf "$(pwd)/packages/coding-agent/examples/extensions/subagent/agents.ts" ~/.pi/agent/extensions/subagent/agents.ts
-
-# Symlink agents
-mkdir -p ~/.pi/agent/agents
-for f in packages/coding-agent/examples/extensions/subagent/agents/*.md; do
-  ln -sf "$(pwd)/$f" ~/.pi/agent/agents/$(basename "$f")
-done
-
-# Symlink workflow prompts
-mkdir -p ~/.pi/agent/prompts
-for f in packages/coding-agent/examples/extensions/subagent/prompts/*.md; do
-  ln -sf "$(pwd)/$f" ~/.pi/agent/prompts/$(basename "$f")
-done
+# Symlink the extension directory
+ln -sf "$(pwd)/packages/coding-agent/examples/extensions/subagent" ~/.pi/agent/extensions/subagent
 ```
+
+### Overriding bundled resources
+
+Bundled agents/prompts have lowest priority. To override:
+- **User-level**: Place in `~/.pi/agent/agents/` or `~/.pi/agent/prompts/` (same filename)
+- **Project-level**: Place in `.pi/agents/` (requires `agentScope: "both"` or `"project"`)
 
 ## Security Model
 

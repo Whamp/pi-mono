@@ -23,6 +23,7 @@ import { type ExtensionAPI, getMarkdownTheme } from "@mariozechner/pi-coding-age
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.js";
+import { registerPromptCommands } from "./prompts.js";
 
 const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
@@ -960,4 +961,7 @@ export default function (pi: ExtensionAPI) {
 			return new Text(text?.type === "text" ? text.text : "(no output)", 0, 0);
 		},
 	});
+
+	// Register bundled prompt templates as commands
+	registerPromptCommands(pi);
 }
