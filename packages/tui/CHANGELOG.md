@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed cursor positioning in browser-based SSH terminals by using absolute column positioning (`\x1b[1G`) instead of `\r`, which some terminal emulators (e.g., via cloudflared) don't handle correctly. This resolves rendering shifts when typing space characters.
+
 ## [0.45.3] - 2026-01-13
 
 ## [0.45.2] - 2026-01-13

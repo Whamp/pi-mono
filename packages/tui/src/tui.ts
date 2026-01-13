@@ -415,11 +415,11 @@ export class TUI extends Container {
 				const lineDiff = targetRow - this.cursorRow;
 				if (lineDiff > 0) buffer += `\x1b[${lineDiff}B`;
 				else if (lineDiff < 0) buffer += `\x1b[${-lineDiff}A`;
-				buffer += "\r";
+				buffer += "\x1b[1G";
 				// Clear extra lines
 				const extraLines = this.previousLines.length - newLines.length;
 				for (let i = 0; i < extraLines; i++) {
-					buffer += "\r\n\x1b[2K";
+					buffer += "\r\n\x1b[1G\x1b[2K";
 				}
 				buffer += `\x1b[${extraLines}A`;
 				buffer += "\x1b[?2026l";
@@ -464,13 +464,14 @@ export class TUI extends Container {
 			buffer += `\x1b[${-lineDiff}A`; // Move up
 		}
 
-		buffer += "\r"; // Move to column 0
+		buffer += "\x1b[1G"; // Move cursor to column 1 (absolute positioning, more reliable than \r in browser terminals)
 
 		// Only render changed lines (firstChanged to lastChanged), not all lines to end
 		// This reduces flicker when only a single line changes (e.g., spinner animation)
 		const renderEnd = Math.min(lastChanged, newLines.length - 1);
 		for (let i = firstChanged; i <= renderEnd; i++) {
 			if (i > firstChanged) buffer += "\r\n";
+			buffer += "\x1b[1G"; // Move to column 1 before each line
 			buffer += "\x1b[2K"; // Clear current line
 			const line = newLines[i];
 			const isImageLine = this.containsImage(line);
@@ -518,7 +519,7 @@ export class TUI extends Container {
 			}
 			const extraLines = this.previousLines.length - newLines.length;
 			for (let i = newLines.length; i < this.previousLines.length; i++) {
-				buffer += "\r\n\x1b[2K";
+				buffer += "\r\n\x1b[1G\x1b[2K";
 			}
 			// Move cursor back to end of new content
 			buffer += `\x1b[${extraLines}A`;
