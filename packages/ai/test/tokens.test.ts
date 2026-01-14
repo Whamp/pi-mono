@@ -55,6 +55,7 @@ async function testTokensOnAbort<TApi extends Api>(llm: Model<TApi>, options: Op
 		llm.provider === "google-gemini-cli" ||
 		llm.provider === "zai" ||
 		llm.provider === "amazon-bedrock" ||
+		llm.provider === "vercel-ai-gateway" ||
 		(llm.provider === "google-antigravity" && llm.id.includes("gpt-oss"))
 	) {
 		expect(msg.usage.input).toBe(0);
@@ -153,6 +154,14 @@ describe("Token Statistics on Abort", () => {
 
 	describe.skipIf(!process.env.MINIMAX_API_KEY)("MiniMax Provider", () => {
 		const llm = getModel("minimax", "MiniMax-M2.1");
+
+		it("should include token stats when aborted mid-stream", { retry: 3, timeout: 30000 }, async () => {
+			await testTokensOnAbort(llm);
+		});
+	});
+
+	describe.skipIf(!process.env.AI_GATEWAY_API_KEY)("Vercel AI Gateway Provider", () => {
+		const llm = getModel("vercel-ai-gateway", "google/gemini-2.5-flash");
 
 		it("should include token stats when aborted mid-stream", { retry: 3, timeout: 30000 }, async () => {
 			await testTokensOnAbort(llm);

@@ -38,6 +38,7 @@ import type {
 import { AssistantMessageEventStream } from "../utils/event-stream.js";
 import { parseStreamingJson } from "../utils/json-parse.js";
 import { sanitizeSurrogates } from "../utils/sanitize-unicode.js";
+import { transformMessages } from "./transform-messages.js";
 
 export interface BedrockOptions extends StreamOptions {
 	region?: string;
@@ -289,6 +290,17 @@ function supportsPromptCaching(model: Model<"bedrock-converse-stream">): boolean
 	return false;
 }
 
+/**
+ * Check if the model supports thinking signatures in reasoningContent.
+ * Only Anthropic Claude models support the signature field.
+ * Other models (OpenAI, Qwen, Minimax, Moonshot, etc.) reject it with:
+ * "This model doesn't support the reasoningContent.reasoningText.signature field"
+ */
+function supportsThinkingSignature(model: Model<"bedrock-converse-stream">): boolean {
+	const id = model.id.toLowerCase();
+	return id.includes("anthropic.claude") || id.includes("anthropic/claude");
+}
+
 function buildSystemPrompt(
 	systemPrompt: string | undefined,
 	model: Model<"bedrock-converse-stream">,
@@ -307,10 +319,10 @@ function buildSystemPrompt(
 
 function convertMessages(context: Context, model: Model<"bedrock-converse-stream">): Message[] {
 	const result: Message[] = [];
-	const messages = context.messages;
+	const transformedMessages = transformMessages(context.messages, model);
 
-	for (let i = 0; i < messages.length; i++) {
-		const m = messages[i];
+	for (let i = 0; i < transformedMessages.length; i++) {
+		const m = transformedMessages[i];
 
 		switch (m.role) {
 			case "user":
@@ -353,11 +365,22 @@ function convertMessages(context: Context, model: Model<"bedrock-converse-stream
 						case "thinking":
 							// Skip empty thinking blocks
 							if (c.thinking.trim().length === 0) continue;
-							contentBlocks.push({
-								reasoningContent: {
-									reasoningText: { text: sanitizeSurrogates(c.thinking), signature: c.thinkingSignature },
-								},
-							});
+							// Only Anthropic models support the signature field in reasoningText.
+							// For other models, we omit the signature to avoid errors like:
+							// "This model doesn't support the reasoningContent.reasoningText.signature field"
+							if (supportsThinkingSignature(model)) {
+								contentBlocks.push({
+									reasoningContent: {
+										reasoningText: { text: sanitizeSurrogates(c.thinking), signature: c.thinkingSignature },
+									},
+								});
+							} else {
+								contentBlocks.push({
+									reasoningContent: {
+										reasoningText: { text: sanitizeSurrogates(c.thinking) },
+									},
+								});
+							}
 							break;
 						default:
 							throw new Error("Unknown assistant content type");
@@ -393,8 +416,8 @@ function convertMessages(context: Context, model: Model<"bedrock-converse-stream
 
 				// Look ahead for consecutive toolResult messages
 				let j = i + 1;
-				while (j < messages.length && messages[j].role === "toolResult") {
-					const nextMsg = messages[j] as ToolResultMessage;
+				while (j < transformedMessages.length && transformedMessages[j].role === "toolResult") {
+					const nextMsg = transformedMessages[j] as ToolResultMessage;
 					toolResults.push({
 						toolResult: {
 							toolUseId: nextMsg.toolCallId,

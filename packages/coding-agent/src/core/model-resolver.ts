@@ -21,12 +21,14 @@ export const defaultModelPerProvider: Record<KnownProvider, string> = {
 	"google-vertex": "gemini-3-pro-preview",
 	"github-copilot": "gpt-4o",
 	openrouter: "openai/gpt-5.1-codex",
+	"vercel-ai-gateway": "anthropic/claude-opus-4.5",
 	xai: "grok-4-fast-non-reasoning",
 	groq: "openai/gpt-oss-120b",
 	cerebras: "zai-glm-4.6",
 	zai: "glm-4.6",
 	mistral: "devstral-medium-latest",
 	minimax: "MiniMax-M2.1",
+	"minimax-cn": "MiniMax-M2.1",
 	opencode: "claude-opus-4-5",
 };
 

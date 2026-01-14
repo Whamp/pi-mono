@@ -56,6 +56,7 @@ Unified LLM API with automatic model discovery, provider configuration, token an
 - **Cerebras**
 - **xAI**
 - **OpenRouter**
+- **Vercel AI Gateway**
 - **MiniMax**
 - **GitHub Copilot** (requires OAuth, see below)
 - **Google Gemini CLI** (requires OAuth, see below)
@@ -710,6 +711,7 @@ interface OpenAICompat {
   supportsDeveloperRole?: boolean;   // Whether provider supports `developer` role vs `system` (default: true)
   supportsReasoningEffort?: boolean; // Whether provider supports `reasoning_effort` (default: true)
   maxTokensField?: 'max_completion_tokens' | 'max_tokens';  // Which field name to use (default: max_completion_tokens)
+  thinkingFormat?: 'openai' | 'zai'; // Format for reasoning param: 'openai' uses reasoning_effort, 'zai' uses thinking: { type: "enabled" } (default: openai)
 }
 ```
 
@@ -862,6 +864,7 @@ In Node.js environments, you can set environment variables to avoid passing API 
 | Cerebras | `CEREBRAS_API_KEY` |
 | xAI | `XAI_API_KEY` |
 | OpenRouter | `OPENROUTER_API_KEY` |
+| Vercel AI Gateway | `AI_GATEWAY_API_KEY` |
 | zAI | `ZAI_API_KEY` |
 | MiniMax | `MINIMAX_API_KEY` |
 | GitHub Copilot | `COPILOT_GITHUB_TOKEN` or `GH_TOKEN` or `GITHUB_TOKEN` |

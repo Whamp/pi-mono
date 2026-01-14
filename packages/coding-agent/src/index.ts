@@ -88,8 +88,6 @@ export type {
 	UserBashEventResult,
 } from "./core/extensions/index.js";
 export {
-	createExtensionRuntime,
-	discoverAndLoadExtensions,
 	ExtensionRunner,
 	isBashToolResult,
 	isEditToolResult,
@@ -98,7 +96,6 @@ export {
 	isLsToolResult,
 	isReadToolResult,
 	isWriteToolResult,
-	loadExtensions,
 	wrapRegisteredTool,
 	wrapRegisteredTools,
 	wrapToolsWithExtensions,
@@ -267,9 +264,11 @@ export {
 } from "./modes/interactive/components/index.js";
 // Theme utilities for custom tools and extensions
 export {
+	getLanguageFromPath,
 	getMarkdownTheme,
 	getSelectListTheme,
 	getSettingsListTheme,
+	highlightCode,
 	initTheme,
 	Theme,
 	type ThemeColor,
