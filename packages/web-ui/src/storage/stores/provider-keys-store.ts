@@ -30,4 +30,8 @@ export class ProviderKeysStore extends Store {
 	async has(provider: string): Promise<boolean> {
 		return this.getBackend().has("provider-keys", provider);
 	}
+
+	async clear(): Promise<void> {
+		await this.getBackend().clear("provider-keys");
+	}
 }

@@ -273,3 +273,6 @@ export {
 	Theme,
 	type ThemeColor,
 } from "./modes/interactive/theme/theme.js";
+
+// RPC Server
+export { RPCServer, type RPCServerConfig, startRPCServer } from "./rpc/server.js";

@@ -1,3 +1,4 @@
+import type { ConnectionsStore } from "./stores/connections-store.js";
 import type { CustomProvidersStore } from "./stores/custom-providers-store.js";
 import type { ProviderKeysStore } from "./stores/provider-keys-store.js";
 import type { SessionsStore } from "./stores/sessions-store.js";
@@ -14,18 +15,21 @@ export class AppStorage {
 	readonly providerKeys: ProviderKeysStore;
 	readonly sessions: SessionsStore;
 	readonly customProviders: CustomProvidersStore;
+	readonly connections: ConnectionsStore;
 
 	constructor(
 		settings: SettingsStore,
 		providerKeys: ProviderKeysStore,
 		sessions: SessionsStore,
 		customProviders: CustomProvidersStore,
+		connections: ConnectionsStore,
 		backend: StorageBackend,
 	) {
 		this.settings = settings;
 		this.providerKeys = providerKeys;
 		this.sessions = sessions;
 		this.customProviders = customProviders;
+		this.connections = connections;
 		this.backend = backend;
 	}
 

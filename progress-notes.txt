@@ -1,992 +1,2666 @@
-## Date Grouping for Session List - COMPLETED
+## Task 50: Add context overflow warning - Completed
 
 ### Files Created
-- `packages/web-ui/src/utils/date-utils.ts` - New utility for date grouping
+- `packages/web-ui/src/components/ContextWarning.ts` - New context warning component
 
 ### Files Modified
-- `packages/web-ui/src/components/Sidebar.ts` - Added date group rendering with sticky headers
-- `packages/web-ui/src/utils/i18n.ts` - Added translations for "Last 7 Days", "Last 30 Days", "Older"
-- `packages/web-ui/src/index.ts` - Added exports for date-utils types and functions
-
-### Implementation Details
-1. Created `groupSessionsByDate<T>()` generic function that groups any object with `lastModified` field
-2. Date boundaries calculated using calendar days (not 24h periods):
-   - Today: same calendar day
-   - Yesterday: previous calendar day
-   - Last 7 Days: 2-7 days ago
-   - Last 30 Days: 8-30 days ago
-   - Older: more than 30 days
-3. Sidebar renders sticky group headers with:
-   - `sticky top-0 z-10` for sticky positioning within scroll container
-   - `bg-background/95 backdrop-blur-sm` for semi-transparent background
-   - `text-xs font-semibold uppercase tracking-wide` for styling
-4. Groups maintain original session order (newest first assumed)
-5. Only non-empty groups are rendered
-6. Full i18n support (English and German)
-
-### Verification
-- `npm run check` passes with no errors
-
----
-
-## Sidebar Search - COMPLETED
-
-### Files Modified
-- `packages/web-ui/src/components/Sidebar.ts` - Added search functionality
-- `packages/web-ui/src/utils/i18n.ts` - Added translations for search strings
-
-### Implementation Details
-1. Added `@state() private searchQuery = ""` for reactive search state
-2. Added debounced search handling (300ms delay):
-   - `searchTimeout?: number` for debounce timer
-   - `handleSearchInput()` clears timeout and sets new one
-   - `handleSearchClear()` resets query and clears input field
-3. Added `getFilteredSessions()` method:
-   - Returns all sessions if query is empty
-   - Case-insensitive filtering on `title` and `preview`
-4. Updated `renderSearchInput()`:
-   - Added `@input` handler for controlled behavior
-   - Added clear button (×) that appears when query has value
-   - Changed padding from `pr-4` to `pr-8` to accommodate clear button
-5. Updated `renderSessionList()`:
-   - Filters sessions BEFORE date grouping
-   - Shows "No results found" state with search icon when search active but no matches
-   - Different empty state for no sessions vs no search results
-
-### i18n Additions
-- "Clear search" / "Suche löschen"
-- "No results found" / "Keine Ergebnisse gefunden"
-- "Try a different search term" / "Versuchen Sie einen anderen Suchbegriff"
-
-### Verification
-- `npm run check` passes with no errors
-- Search filters sessions in real-time with 300ms debounce
-- Clear button (×) appears when search has value
-- Empty search results show appropriate "No results" message with search icon
-
----
-
-## Session Context Menu - COMPLETED
-
-### Files Modified
-- `packages/web-ui/src/components/Sidebar.ts` - Added context menu and delete confirmation dialog
-- `packages/web-ui/src/utils/i18n.ts` - Added translations for context menu strings
-
-### Implementation Details
-1. Added new state properties:
-   - `@state() private contextMenuSessionId: string | null = null`
-   - `@state() private contextMenuPosition: { x: number; y: number } | null = null`
-   - `@state() private showDeleteConfirm: string | null = null`
-
-2. Added new callback prop:
-   - `@property({ attribute: false }) onDelete?: (sessionId: string) => void`
-
-3. Context menu handling:
-   - `handleSessionContextMenu()` - Opens menu at click position with viewport boundary checks
-   - `closeContextMenu()` - Closes menu and removes click listener
-   - `boundHandleClickOutside` - Bound reference for document click listener
-   - Uses `setTimeout` to defer click listener attachment (prevents immediate close)
-
-4. Delete confirmation:
-   - `handleDeleteClick()` - Shows confirmation dialog
-   - `closeDeleteConfirm()` - Closes dialog
-   - `confirmDelete()` - Calls `onDelete` callback and closes dialog
-
-5. Rename option:
-   - `handleRenameClick()` - Placeholder that closes menu (actual implementation in Task 6)
-
-6. UI Implementation:
-   - Context menu uses `fixed z-50` positioning with `bg-popover` styling
-   - Delete button uses `text-destructive` color
-   - Confirmation dialog uses modal pattern with backdrop (`bg-black/50`)
-   - Buttons styled consistently with existing dialog patterns
-
-7. Click-outside handling:
-   - Document click listener added when menu opens
-   - Removed on `disconnectedCallback` and when menu closes
-   - Uses `.context-menu-container` class to detect outside clicks
-
-### i18n Additions
-- "Rename" / "Umbenennen"
-- "Delete conversation?" / "Konversation löschen?"
-- "This action cannot be undone." / "Diese Aktion kann nicht rückgängig gemacht werden."
-
-### Verification
-- `npm run check` passes with no errors
-- Context menu opens on ⋮ click
-- Delete shows confirmation dialog
-- Rename option exists (functional implementation pending Task 6)
-
-## Inline Session Rename - Completed 2026-01-14 17:41
-
-### Changes Made
-
-**SessionItem.ts:**
-- Added `isEditing` property (boolean)
-- Added `onRename` callback prop (newTitle: string) => void
-- Added `onCancelEdit` callback prop () => void
-- Added `updated()` lifecycle method to auto-focus and select input text
-- Added `handleEditKeydown()` - Enter saves, Escape cancels
-- Added `handleEditBlur()` - cancels edit on focus loss
-- Title row now shows input field when isEditing is true
-
-**Sidebar.ts:**
-- Added `editingSessionId` state to track which session is being edited
-- Added `onRename` callback prop for external handling
-- Updated `handleRenameClick()` to set editingSessionId
-- Added `handleSessionRename()` to call onRename and clear edit state
-- Added `handleCancelEdit()` to clear edit state
-- Updated `renderSessionItem()` to pass isEditing, onRename, onCancelEdit props
-
-### Verification
-- npm run check passes with no errors
-
-
-## Session Export Feature (2026-01-14)
-
-### Completed
-Added Export option to sidebar session context menu.
-
-### Files Created
-- `packages/web-ui/src/utils/export-utils.ts` - Export utility with ExportableSession interface and exportSessionAsJson function
-
-### Files Modified
-- `packages/web-ui/src/components/Sidebar.ts` - Added onExport callback prop, handleExportClick method, and Export button in context menu (between Rename and Delete)
-- `packages/web-ui/src/utils/i18n.ts` - Added "Export" translation key for EN/DE
-- `packages/web-ui/src/index.ts` - Exported ExportableSession type and exportSessionAsJson function
-
-### Validation
-- `npm run check`: PASS (biome lint, tsc, tsgo all clean)
-
-
-## Task: Enhance Session Metadata Tracking
-
-### Completed
-- Extended `SessionMetadata` interface in `packages/web-ui/src/components/Sidebar.ts` with optional `usage` field
-- Added `SessionUsage` interface with `totalInputTokens`, `totalOutputTokens`, `totalCost` fields
-- Updated `packages/web-ui/src/components/SessionItem.ts` to display cost in metadata row when usage data is present
-- Exported `SessionUsage` type from `packages/web-ui/src/index.ts`
-
-### Files Changed
-- `packages/web-ui/src/components/Sidebar.ts` - Added SessionUsage interface and optional usage field to SessionMetadata
-- `packages/web-ui/src/components/SessionItem.ts` - Added formatSessionCost helper, display cost in metadata row
-- `packages/web-ui/src/index.ts` - Exported SessionUsage type
-
-### Validation Output
-- npm run check: clean (no errors, no warnings)
-- Biome lint: Checked 407 files, no fixes needed
-- TypeScript: no errors
-
-### Display Format
-Cost appears in session item metadata row as:
-- `12:34 PM · 5 messages` (no usage data)
-- `12:34 PM · 5 messages · $0.02` (with usage data)
-- `12:34 PM · 5 messages · <$0.01` (for costs under 1 cent)
-
-### Notes
-- The storage type (`packages/web-ui/src/storage/types.ts`) already has full usage tracking
-- The Sidebar's SessionMetadata is a simpler UI-focused interface used by SessionItem
-- Consuming applications populate usage data when saving sessions; this task just ensures UI display
-
-## AppLayout Component - Completed
-
-### Files Created/Modified:
-- `packages/web-ui/src/components/AppLayout.ts` - NEW FILE
-- `packages/web-ui/src/index.ts` - Added export
-
-### Implementation Details:
-
-**Component Structure:**
-- Lit component with decorators
-- Light DOM (`createRenderRoot() { return this; }`)
-- Tailwind CSS classes
-- Tag name: `pi-app-layout`
-
-**Props:**
-- `sidebarOpen: boolean` - Controls sidebar visibility
-- `artifactsOpen: boolean` - Controls artifacts panel visibility
-- `onSidebarToggle?: () => void` - Callback for sidebar toggle
-- `onArtifactsToggle?: () => void` - Callback for artifacts toggle
-
-**Slots:**
-- `sidebar` - Sidebar content slot
-- `header` - Header content slot
-- Default slot - Main chat content
-
-**Responsive Breakpoints:**
-- Mobile (<768px): Sidebar and artifacts as full-screen overlay
-- Tablet (768-1023px): Sidebar as drawer, artifacts as overlay
-- Desktop (≥1024px): Sidebar visible, artifacts as overlay
-- Desktop XL (≥1280px): Sidebar and artifacts as side panels
-
-**Features:**
-- Responsive state tracking via window resize listener
-- Backdrop overlay for drawer/overlay modes
-- Smooth slide transitions (300ms duration)
-- Proper z-index layering (z-10 for backdrop, z-20 for drawers)
-
-### Validation:
-- `npm run check` - PASSED (no errors)
-
-## Header Component - Completed
-
-### Files Created
-- `packages/web-ui/src/components/Header.ts` - New header component with:
-  - Hamburger menu button (conditionally shown via `showMenuButton`)
-  - Editable session title (click to edit, Enter saves, Escape cancels)
-  - Model badge with thinking level abbreviation
-  - Streaming indicator with animated dot
-  - New chat and settings action buttons
-  - Responsive design (hides model badge and new chat on mobile)
-
-### Files Modified
-- `packages/web-ui/src/index.ts` - Added Header export
-- `packages/web-ui/src/utils/i18n.ts` - Added i18n keys:
-  - "Open menu"
-  - "Responding..."
-  - "Click to edit title"
-
-### Verification
-- `npm run check` passes with no errors
-- All TypeScript types are correct
-- Biome linting passes
-
-### Component API
-```typescript
-@property({ type: String }) title = 'New Chat';
-@property({ type: Boolean }) showMenuButton = false;
-@property({ type: String }) modelName?: string;
-@property({ type: String }) thinkingLevel?: string;
-@property({ type: Boolean }) isStreaming = false;
-@property({ attribute: false }) onMenuClick?: () => void;
-@property({ attribute: false }) onTitleEdit?: (newTitle: string) => void;
-@property({ attribute: false }) onModelClick?: () => void;
-@property({ attribute: false }) onSettingsClick?: () => void;
-@property({ attribute: false }) onNewChatClick?: () => void;
-```
-
-## Artifacts Panel Integration in Layout - VERIFIED
-
-### Task
-Verify that AppLayout correctly handles the ArtifactsPanel at all breakpoints.
-
-### Files Examined
-- `packages/web-ui/src/components/AppLayout.ts` - Layout orchestration
-- `packages/web-ui/src/tools/artifacts/artifacts.ts` - ArtifactsPanel component
-- `packages/web-ui/specs/ui/artifacts.md` - Specification
-
-### Analysis Results
-
-**AppLayout Breakpoints (Correct):**
-- Mobile (<768px): Artifacts as full-width drawer with slide animation
-- Tablet (768-1023px): Artifacts as 400px drawer from right with slide animation
-- Desktop (1024-1279px): Artifacts as 400px drawer from right with slide animation
-- Desktop XL (≥1280px): Artifacts as static 400px side panel
-
-**Artifacts Container Rendering Logic (Correct):**
-```typescript
-${this.artifactsOpen || !this.isDesktopXL ? html`<div class="${this.getArtifactsClasses()}"><slot name="artifacts"></slot></div>` : nothing}
-```
-- Desktop XL, closed: Container not rendered (no space reserved) ✓
-- Desktop XL, open: Container rendered as 400px side panel ✓
-- Other screens: Container always in DOM for slide animations ✓
-
-**getArtifactsClasses() (Correct):**
-- Desktop XL + open: `relative w-[400px] flex-shrink-0 border-l border-border`
-- Other cases: `fixed inset-y-0 right-0 z-20 w-[400px|w-full] transform transition-transform duration-300`
-
-**Backdrop Logic (Correct):**
-- Mobile: Shows for sidebar OR artifacts
-- Tablet: Shows for sidebar OR artifacts
-- Desktop (non-XL): Shows for artifacts only
-- Desktop XL: No backdrop (both are side panels)
-
-### Usage Note for Parent Components
-When using ArtifactsPanel inside AppLayout:
-- Set `artifactsPanel.overlay = false` - AppLayout handles all positioning
-- AppLayout's slot container provides drawer/side-panel behavior
-- ArtifactsPanel just fills its container with `relative h-full`
-
-The `overlay` prop on ArtifactsPanel is designed for standalone usage (like ChatPanel) where no external layout component handles positioning. When used with AppLayout, overlay should be false.
-
-### Verification
-- `npm run check`: PASSED (no errors)
-- All breakpoint scenarios verified against requirements
-- No code changes needed
-
-### Notes
-- Desktop XL side panel appears/disappears instantly (no animation) - this is intentional for "static side panel" behavior
-- Slide animations work correctly for drawer mode on mobile/tablet/desktop
-- 300ms transition duration applied correctly via `transition-transform duration-300`
-
-## Refactor Example App to Use New Layout - Completed
-
-### Task
-Replace the current render logic in the example app with `<pi-app-layout>`, `<pi-sidebar>`, and `<pi-header>` components.
-
-### Analysis
-The example app already had the new layout components implemented. The issues found were:
-
-1. **Incorrect imports**: `AppLayout`, `Header`, `Sidebar` were imported as classes but used as custom elements via HTML templates. Biome flagged them as unused.
-
-2. **Outdated event handling**: Agent subscription used `"state-update"` event type which doesn't exist. The Agent emits events like `"message_start"`, `"message_end"`, `"turn_start"`, `"turn_end"`, `"agent_start"`, `"agent_end"`, `"message_update"`.
-
-3. **Stale dist files**: The built package didn't include the new components since the exports were added after the last build.
-
-### Changes Made
-
-**File: `packages/web-ui/example/src/main.ts`**
-
-1. Changed imports from class imports to side-effect imports:
-```typescript
-// Before
-import { AppLayout, Header, Sidebar, ... } from "@mariozechner/pi-web-ui";
-
-// After - import from main package (for types/utilities)
-import { type SidebarSessionMetadata, ... } from "@mariozechner/pi-web-ui";
-// Side-effect imports: these register custom elements
-import "@mariozechner/pi-web-ui/dist/components/AppLayout.js";
-import "@mariozechner/pi-web-ui/dist/components/Header.js";
-import "@mariozechner/pi-web-ui/dist/components/Sidebar.js";
-```
-
-2. Fixed agent subscription to use correct event types:
-```typescript
-// Before
-agentUnsubscribe = agent.subscribe((event) => {
-  if (event.type === "state-update") {
-    const messages = event.state.messages;
-    // ...
-  }
-});
-
-// After
-agentUnsubscribe = agent.subscribe((event) => {
-  const updateEvents = ["message_start", "message_end", "turn_start", "turn_end", "agent_start", "agent_end"];
-  if (updateEvents.includes(event.type)) {
-    const messages = agent.state.messages;
-    // ...
-  } else if (event.type === "message_update") {
-    renderApp();
-  }
-});
-```
-
-3. Moved `AgentState` import from web-ui to agent-core package where it's defined.
-
-### Validation Output
-- `npm run check`: PASSED (no errors)
-- Biome lint: clean
-- TypeScript: clean for both main package and example
-
-### Notes
-- Rebuilt `packages/web-ui` to update dist files with new exports
-- Custom elements are registered via side-effect imports to avoid unused import warnings
-- The HTML template references (`<pi-app-layout>`, `<pi-sidebar>`, `<pi-header>`) work correctly with custom element registration
-
-
-## Safe Area Handling for Mobile - Completed
-
-### Task
-Add `env(safe-area-inset-*)` handling for notched devices.
-
-### Files Modified
-
-**packages/web-ui/src/components/AppLayout.ts**
-- Added inline style to root container div with safe area padding:
-  - `padding-top: env(safe-area-inset-top, 0px)`
-  - `padding-left: env(safe-area-inset-left, 0px)`
-  - `padding-right: env(safe-area-inset-right, 0px)`
-- Bottom inset is handled at input area level (not layout container)
-
-**packages/web-ui/example/index.html**
-- Added `viewport-fit=cover` to viewport meta tag
-- This is required for iOS to expose safe area environment variables
-
-### Validation Output
-```
-npm run check: PASSED
-- biome check: Checked 409 files in 223ms. No fixes applied.
-- tsgo --noEmit: clean
-- tsc --noEmit: clean
-```
-
-### Notes
-- Safe area insets only affect devices with notches/dynamic islands (iPhone X+)
-- On devices without notches, `env()` fallback (0px) is used
-- The spec in `layout.md` documents this pattern for `.app-layout`
-
-## Swipe Gesture for Sidebar - Completed
-
-### Task
-Add swipe gesture detection for opening/closing the sidebar on mobile/tablet devices.
-
-### Files Created
-- `packages/web-ui/src/utils/gesture-utils.ts` - Swipe detection utility with:
-  - `SwipeOptions` interface (threshold, edgeWidth, direction, onSwipe, fromEdge)
-  - `SwipeHandler` interface (attach, detach methods)
-  - `createSwipeHandler()` factory function
-
-### Files Modified
-- `packages/web-ui/src/components/AppLayout.ts` - Added swipe handlers:
-  - Import `createSwipeHandler` and `SwipeHandler` type
-  - Added `sidebarOpenSwipeHandler`, `sidebarCloseSwipeHandler`, `sidebarElement` properties
-  - `setupSwipeHandlers()` - Creates and attaches edge swipe handler for opening sidebar
-  - `cleanupSwipeHandlers()` - Detaches all handlers on disconnect
-  - `updated()` lifecycle - Dynamically attaches close swipe handler when sidebar opens
-
-- `packages/web-ui/src/index.ts` - Added exports:
-  - `SwipeHandler` type
-  - `SwipeOptions` type
-  - `createSwipeHandler` function
+- `packages/web-ui/src/components/AgentInterface.ts` - Integrated context warning
+  - Added import for ContextWarning component
+  - Added `maxContextTokens` property (default 128000)
+  - Added `onCompact` callback property
+  - Added `_getTotalTokens()` method to calculate total tokens from usage data
+  - Updated `render()` to include `<context-warning>` after find bar
+
+- `packages/web-ui/src/index.ts` - Added export for ContextWarning component
+
+- `packages/web-ui/src/utils/i18n.ts` - Added i18n translations:
+  - "Context is {percentage}% full" / "Kontext ist zu {percentage}% gefüllt"
+  - "Compact Now" / "Jetzt komprimieren"
 
 ### Implementation Details
 
-**Swipe Detection Logic:**
-- Uses `touchstart` and `touchend` events (passive listeners)
-- Tracks start position and validates swipe direction
-- Checks horizontal vs vertical dominance to avoid conflicts with scrolling
-- Supports edge-only triggers (left edge for opening sidebar)
-
-**Sidebar Open Gesture:**
-- Attached to AppLayout component
-- Swipe right from left edge (20px zone)
-- Only triggers on mobile/tablet (when `!isDesktop`)
-- Only triggers when sidebar is closed
-
-**Sidebar Close Gesture:**
-- Attached to sidebar container element after it opens
-- Swipe left anywhere on sidebar
-- Dynamically attached/detached based on `sidebarOpen` state
-- Uses class selector `[class*="inset-y-0"][class*="left-0"]` to find sidebar element
-
-### Validation Output
-```
-npm run check: PASSED
-- biome check: Checked 410 files. No fixes applied.
-- tsgo --noEmit: clean
-- tsc --noEmit: clean (main package and example)
-```
-
-### Testing Notes
-- Use Chrome DevTools device emulation with touch simulation
-- Swipe from left edge (first 20px) to open sidebar
-- Swipe left on open sidebar to close
-- Gestures only work on mobile/tablet breakpoints (< 1024px)
-
-
-## Swipe-to-Delete for SessionItem
-
-### Completed
-Added swipe-to-delete functionality to `packages/web-ui/src/components/SessionItem.ts`:
-
-**State & Properties Added:**
-- `swipeOffset` state for tracking swipe position
-- `isSwiping` state for detecting active swipe
-- `onDelete` callback property
-- Touch tracking variables (`touchStartX`, `touchStartY`, `swipeDirectionLocked`)
-
-**Touch Handlers:**
-- `handleTouchStart()` - Records touch position, starts swipe tracking
-- `handleTouchMove()` - Calculates offset, locks direction (horizontal vs vertical), prevents scroll
-- `handleTouchEnd()` - Snaps to open (-80px) or closed (0) based on threshold
-- `handleDeleteClick()` - Triggers delete callback, resets swipe state
-
-**Render Changes:**
-- Wrapped content in swipe container with `overflow-hidden`
-- Added delete button (80px width) behind session content with trash icon
-- Session content slides left using `translateX()` transform
-- Spring-back animation via `transition-transform duration-200 ease-out` (disabled during active swipe)
-
-**i18n Updates:**
-- Added "Delete session" key to interface and both English/German translations
-
-### Validation Output
-- `npm run check`: Passed with no errors
-- No suppressions added
-
-## Task: Optimize Touch Targets
-
-### Summary
-Ensured all interactive elements have minimum 44x44px touch targets (WCAG 2.5.5 / Apple HIG).
-
-### Components Updated
-
-**Sidebar.ts:**
-- Settings button: Added `min-w-11 min-h-11 flex items-center justify-center`
-- Clear search button: Changed `p-1` to `p-2.5`, added `flex items-center justify-center`
-
-**Header.ts:**
-- Menu button (hamburger): Added `min-w-11 min-h-11 flex items-center justify-center`
-- Model badge: Changed `px-2 py-1` to `px-3 min-h-11`, changed `block` to `flex items-center justify-center`
-- New Chat button: Added `min-w-11 min-h-11`, changed `block` to `flex items-center justify-center`
-- Settings button: Added `min-w-11 min-h-11 flex items-center justify-center`
-
-**SessionItem.ts:**
-- Context menu button (⋮): Changed `p-1` to `p-2 min-w-11 min-h-11 -m-1`, added `flex items-center justify-center`
-- Delete button (swipe): Already adequate at 80px wide × full height
-- Main session button: Already adequate with `p-3` and full content width
-
-### Validation Output
-- `npm run check`: Passed with no errors
-- All lint rules clean
-- TypeScript: No errors
-
-## Task: Handle Virtual Keyboard - Completed
-
-### Summary
-Added `visualViewport` API handling to keep the input visible when the virtual keyboard opens on mobile.
-
-### Files Modified
-
-**packages/web-ui/src/components/MessageEditor.ts:**
-- Added `@state() private keyboardOffset = 0` reactive property
-- Added `setupKeyboardHandling()` method - Attaches resize/scroll listeners to `window.visualViewport`
-- Added `teardownKeyboardHandling()` method - Removes listeners on cleanup
-- Added `handleViewportResize()` handler - Calculates keyboard height from `window.innerHeight - visualViewport.height`
-- Added `connectedCallback()` override - Sets up keyboard handling on mount
-- Added `disconnectedCallback()` override - Tears down keyboard handling on unmount
-- Updated `render()` - Applies `margin-bottom: ${keyboardOffset}px` to main container when keyboard is open
-
-### Implementation Details
-
-**How it works:**
-1. When the virtual keyboard opens on mobile (especially iOS with `viewport-fit=cover`):
-   - `window.visualViewport.height` shrinks to the visible area above keyboard
-   - `window.innerHeight` remains the full viewport height
-   - The difference is the keyboard height
-
-2. The component calculates `keyboardHeight = window.innerHeight - visualViewport.height`
-
-3. When `keyboardHeight > 0`, a `margin-bottom` is applied to push the input above the keyboard
-
-**Why margin-bottom vs transform:**
-- `margin-bottom` works better with flex layouts (the parent `shrink-0` container)
-- Doesn't conflict with other transforms that might be applied
-- Naturally integrates with the existing layout flow
-
-**Existing Layout Already Helps:**
-- `AppLayout` uses `h-dvh` (dynamic viewport height) which automatically adjusts on keyboard open/close
-- The flex layout with `shrink-0` on the input area keeps it anchored to the bottom
-- The `visualViewport` API provides additional insurance for edge cases on iOS Safari
-
-### Validation Output
-- `npm run check`: PASSED (no errors)
-- Biome lint: clean
-- TypeScript: clean
-
-## Toast Notification Component - Completed
-
-### Files Created
-
-**packages/web-ui/src/components/Toast.ts:**
-- Lit component with `@customElement("pi-toast")` decorator
+**ContextWarning Component:**
+- Props: `currentTokens`, `maxTokens`, `onCompact` (optional)
+- Shows warning when currentTokens/maxTokens >= 0.8 (80%)
+- Displays percentage with amber/warning styling
+- "Compact Now" button appears when `onCompact` callback is provided
+- Uses `AlertTriangle` icon from lucide
+- Automatically hides (display: none) when below threshold
 - Light DOM rendering (no shadow DOM)
-- Properties: `message`, `variant` (success/error/info), `visible`, `duration`, `onClose`
-- Auto-dismiss with configurable duration (default 3000ms)
-- Clears timeout on disconnect and manual close
-- Variants with appropriate icons (CheckCircle, AlertCircle, Info from lucide)
-- Variant styles: green (success), red (error), zinc-800 (info)
-- Smooth opacity/translate animation via `transition-all duration-300`
-- ARIA attributes: `role="status"`, `aria-live` (assertive for error, polite for others), `aria-atomic="true"`
 
-**packages/web-ui/src/utils/toast.ts:**
-- `ToastOptions` interface: message, variant?, duration?
-- `showToast(options: ToastOptions | string)` - Simple API accepting string or options object
-- `dismissAllToasts()` - Clears all active toasts
-- Creates container div (`#pi-toast-container`) with fixed bottom positioning
-- Uses `crypto.randomUUID()` for unique toast IDs
-- Handles removal with fade-out animation (300ms delay before DOM removal)
-- Container check ensures container exists and is attached to body
+**AgentInterface Integration:**
+- Token calculation includes: input, output, cacheRead, cacheWrite from all assistant messages
+- Context warning appears after find bar, before messages area
+- Warning updates reactively as token usage changes
 
-### Files Modified
-
-**packages/web-ui/src/index.ts:**
-- Added exports: `Toast`, `ToastVariant` type
-- Added exports: `ToastOptions` type, `showToast`, `dismissAllToasts`
-
-### Usage
-```typescript
-import { showToast } from '@mariozechner/pi-web-ui';
-
-showToast('Session exported successfully');
-showToast({ message: 'Failed to delete', variant: 'error' });
-showToast({ message: 'Session saved', variant: 'success' });
-showToast({ message: 'Loading...', variant: 'info', duration: 5000 });
+### Component Layout
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│ ⚠️ Context is 85% full. Consider compacting to continue.  [Compact Now]   │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Validation Output
-- `npm run check`: PASSED (no errors, no warnings, no infos)
-
-## Loading Skeletons - Completed
-
-### Task
-Show skeleton loading states while sessions load and while waiting for first token.
-
-### Analysis
-
-**StreamingMessageContainer already handles waiting state:**
-- When `isStreaming=true` but no message has arrived yet, it shows a pulsing cursor:
-  ```typescript
-  if (this.isStreaming)
-    return html`<span class="mx-4 inline-block w-2 h-4 bg-muted-foreground animate-pulse"></span>`;
-  ```
-- No additional changes needed for MessageList
-
-**Sidebar needed skeleton loading state:**
-- Added `loading` property to show skeleton while sessions are being fetched
-
-### Files Modified
-
-**packages/web-ui/src/components/Sidebar.ts:**
-- Added `@property({ type: Boolean }) loading = false` property
-- Added `renderSessionSkeleton()` method:
-  - Renders 4 skeleton session items
-  - Each item has 3 placeholder bars (title, preview line 1, preview line 2)
-  - Uses `animate-pulse` for loading animation
-  - Uses `bg-muted` for placeholder colors
-  - Width varies (w-3/4, w-full, w-1/2) to look natural
-- Updated `renderSessionList()` to check `loading` first and render skeleton
-
-### Skeleton Structure
-```html
-<div class="flex flex-col gap-2 p-2">
-  <!-- 4 skeleton items -->
-  <div class="p-3 rounded-md">
-    <div class="h-4 bg-muted rounded w-3/4 mb-2 animate-pulse"></div>
-    <div class="h-3 bg-muted rounded w-full mb-2 animate-pulse"></div>
-    <div class="h-3 bg-muted rounded w-1/2 animate-pulse"></div>
-  </div>
-</div>
-```
+### Styling
+- Background: `bg-amber-50 dark:bg-amber-950/30`
+- Border: `border-amber-200 dark:border-amber-800`
+- Icon: `text-amber-600 dark:text-amber-400`
+- Text: `text-amber-900 dark:text-amber-100`
+- Button: `bg-amber-600 hover:bg-amber-700 text-white`
 
 ### Validation Output
 - `npm run check`: PASSED (no errors)
-- Biome lint: Checked 412 files, no fixes needed
+- Biome lint: Checked 430 files, no fixes needed
 - TypeScript: clean
 
 ### Usage
 ```typescript
-// Set loading=true while fetching sessions
-<pi-sidebar .loading=${true} .sessions=${[]}></pi-sidebar>
-
-// Set loading=false and provide sessions when ready
-<pi-sidebar .loading=${false} .sessions=${sessions}></pi-sidebar>
+<agent-interface
+  .session=${session}
+  .maxContextTokens=${200000}
+  .onCompact=${() => compactConversation()}
+></agent-interface>
 ```
 
 ### Notes
-- MessageList/StreamingMessageContainer already has loading state for waiting on first token
-- Skeleton uses Tailwind's `animate-pulse` which is simpler and already available
+- The component is informational - parent app handles actual compaction logic
+- Default maxContextTokens is 128000 (common for Claude models)
+- Warning uses template string replacement for percentage placeholder
 
-## Add Empty States - Completed
+---
 
-### Task
-Show friendly empty states: "No conversations yet" in sidebar (already done), welcome message with suggested prompts in chat.
-
-### Verification of Sidebar Empty State
-Already implemented in `Sidebar.ts` with:
-- Chat bubble icon (SVG)
-- "No conversations yet" text
-- "Start a new chat to begin" subtext
-
-### Files Modified
-
-**packages/web-ui/src/components/MessageList.ts:**
-- Added `SuggestedPrompt` interface with `title`, `description`, `prompt` fields
-- Added `onSuggestedPrompt?: (prompt: string) => void` callback property
-- Added `defaultSuggestions` array with 4 suggested prompts:
-  - Explain a concept / quantum computing
-  - Write code / React component
-  - Brainstorm ideas / project planning
-  - Analyze data / dataset insights
-- Added `renderEmptyState()` method:
-  - Chat bubble icon (16x16, text-primary)
-  - "How can I help you today?" heading
-  - "Ask me anything or try one of these suggestions" subtext
-  - 2x2 grid of clickable suggestion buttons
-  - Each button shows title and description
-  - Click triggers onSuggestedPrompt callback
-- Updated `render()` to check for empty messages and show empty state
-
-**packages/web-ui/src/components/MessageEditor.ts:**
-- Added public `focus()` method to focus the textarea
-
-**packages/web-ui/src/components/AgentInterface.ts:**
-- Added `handleSuggestedPrompt` callback to set input and focus editor
-- Passed `onSuggestedPrompt` handler to `message-list` component
-
-**packages/web-ui/src/utils/i18n.ts:**
-- Added i18n interface keys and translations (EN/DE) for:
-  - "How can I help you today?"
-  - "Ask me anything or try one of these suggestions"
-  - "Explain a concept"
-  - "Help me understand quantum computing"
-  - "Write code"
-  - "Create a React component"
-  - "Brainstorm ideas"
-  - "Help me plan a project"
-  - "Analyze data"
-  - "Help me understand this dataset"
-
-### Validation Output
-- `npm run check`: PASSED (no errors)
-- Biome lint: Checked 412 files, no fixes needed
-- TypeScript: clean
-
-### Behavior
-- When MessageList has no messages, shows welcome screen with suggested prompts
-- Clicking a prompt fills the input and focuses the editor
-- Grid is responsive (1 column on mobile, 2 columns on sm+)
-- All text is i18n-enabled
-
-
-## Keyboard Shortcuts Implementation - Wed Jan 14 06:19:44 PM PST 2026
-
-### Completed
-Implemented global keyboard shortcuts for the web UI.
+## Task 51: Define RPC types and interfaces - Completed
 
 ### Files Created
-- `packages/web-ui/src/utils/keyboard-shortcuts.ts` - Keyboard shortcut manager utility
+- `packages/web-ui/src/networking/rpc-types.ts` - RPC protocol types for WebSocket communication
 
 ### Files Modified
-- `packages/web-ui/src/components/AppLayout.ts` - Integrated shortcut manager
-- `packages/web-ui/src/index.ts` - Exported keyboard utilities
-
-### Changes
-
-**keyboard-shortcuts.ts:**
-- Created `KeyboardShortcut` interface with key, modifiers (ctrl/meta/shift/alt), handler, description
-- Created `ShortcutManager` interface with register/unregister/attach/detach methods
-- Created `createShortcutManager()` factory function
-- Platform-aware: treats Cmd (meta) and Ctrl as unified "mod" key
-- Skips input fields except for Escape key
-
-**AppLayout.ts:**
-- Added `onNewChat` and `onSearch` callback properties
-- Added `shortcutManager` private field
-- Added `setupKeyboardShortcuts()` method that registers:
-  - Cmd/Ctrl+B: Toggle sidebar
-  - Cmd/Ctrl+N: New chat
-  - Cmd/Ctrl+K: Search
-  - Escape: Close sidebar (mobile) and artifacts panel
-- Shortcuts attached on connectedCallback, detached on disconnectedCallback
-
-### Validation Output
-```
-npm run check: All checks passed
-- biome check: 0 issues
-- tsgo --noEmit: clean
-- tsc --noEmit: clean
-```
-
-
-
-## ErrorBanner Component - Completed
-
-### Task
-Create an error banner component with clear error states for: rate limit (with retry timer), network error (with retry button), context overflow, auth, and generic errors.
-
-### Files Created
-- `packages/web-ui/src/components/ErrorBanner.ts` - New error banner component
-
-### Files Modified
-- `packages/web-ui/src/index.ts` - Added export for ErrorBanner and ErrorType
+- `packages/web-ui/src/index.ts` - Added exports for all RPC types
 
 ### Implementation Details
 
-**Component API:**
-```typescript
-export type ErrorType = 'rate-limit' | 'network' | 'context-overflow' | 'auth' | 'generic';
+**RPC Command Types:**
+- `prompt` - Send user message (with optional images and streamingBehavior)
+- `steer` - Queue steering message to interrupt mid-run
+- `follow_up` - Queue follow-up message for after agent finishes
+- `abort` - Abort current agent operation
+- `new_session` - Start fresh session (with optional parentSession)
+- `get_state` - Get current session state
+- `set_model` - Switch to specific model
+- `cycle_model` - Cycle to next available model
+- `get_available_models` - List all configured models
+- `set_thinking_level` - Set reasoning level
+- `cycle_thinking_level` - Cycle through thinking levels
+- `set_steering_mode` - Set steering delivery mode (all/one-at-a-time)
+- `set_follow_up_mode` - Set follow-up delivery mode (all/one-at-a-time)
+- `compact` - Manual compaction with optional instructions
+- `set_auto_compaction` - Enable/disable auto-compaction
+- `set_auto_retry` - Enable/disable auto-retry
+- `abort_retry` - Abort in-progress retry
+- `bash` - Execute bash command
+- `abort_bash` - Abort running bash command
+- `get_session_stats` - Get token usage and cost stats
+- `export_html` - Export session to HTML
+- `switch_session` - Load different session file
+- `fork` - Create fork from previous user message
+- `get_fork_messages` - Get user messages available for forking
+- `get_last_assistant_text` - Get text of last assistant message
+- `get_messages` - Get all messages in conversation
 
-@customElement('pi-error-banner')
-export class ErrorBanner extends LitElement {
-  @property({ type: String }) type: ErrorType = 'generic';
-  @property({ type: String }) message = '';
-  @property({ type: Number }) retryAfter?: number;
-  @property({ attribute: false }) onRetry?: () => void;
-  @property({ attribute: false }) onDismiss?: () => void;
-  @state() private countdown = 0;
+**RPC Event Types:**
+- `agent_start` - Agent begins processing
+- `agent_end` - Agent completes with all generated messages
+- `turn_start` - New turn begins
+- `turn_end` - Turn completes (message + tool results)
+- `message_start` - Message begins
+- `message_update` - Streaming update with delta events
+- `message_end` - Message completes
+- `tool_execution_start` - Tool begins execution
+- `tool_execution_update` - Tool progress (streaming output)
+- `tool_execution_end` - Tool completes
+- `auto_compaction_start` - Auto-compaction begins
+- `auto_compaction_end` - Auto-compaction completes
+- `auto_retry_start` - Auto-retry begins after transient error
+- `auto_retry_end` - Auto-retry completes
+- `hook_error` - Hook threw error
+
+**Supporting Types:**
+- `RPCSessionState` - Current session state (model, thinkingLevel, isStreaming, etc.)
+- `RPCSuccessResponse` - Success responses for each command type
+- `RPCErrorResponse` - Error responses with error message
+- `RPCToolCall` - Tool call representation (id, name, arguments)
+- `RPCToolResult` - Tool result (content blocks, details)
+- `RPCompactionResult` - Compaction result (summary, tokensBefore)
+- `RPCBashResult` - Bash execution result (output, exitCode, truncated)
+- `RPCSessionStats` - Session statistics (messages, tokens, cost)
+- `RPCAssistantMessageDeltaEvent` - Streaming delta events (text/thinking/toolcall)
+- `RPCExtensionUIRequest` - Extension UI requests (select, confirm, input, editor, notify)
+- `RPCExtensionUIResponse` - Extension UI responses
+
+**Design Decisions:**
+- All types are exported from main index.ts for easy importing
+- Uses `id?: string` for optional request/response correlation
+- Events don't include `id` field (only responses do)
+- Mirrors RPC types from `packages/coding-agent/src/modes/rpc/rpc-types.ts`
+- Imported AgentMessage and ThinkingLevel from @mariozechner/pi-agent-core
+- Imported Model and ImageContent from @mariozechner/pi-ai
+
+### Validation Output
+- `npm run check`: PASSED (no errors)
+- Biome lint: Checked 431 files, fixed 1 file
+- TypeScript: clean (no errors)
+- All types properly exported from package index
+
+### Usage
+```typescript
+import type {
+  RPCCommand,
+  RPCEvent,
+  RPCResponse,
+  RPCSessionState,
+} from "@mariozechner/pi-web-ui";
+
+// Send command
+const command: RPCCommand = { type: "get_state" };
+
+// Handle events
+if (event.type === "message_update") {
+  const delta = event.assistantMessageEvent;
+  if (delta.type === "text_delta") {
+    // Append delta to UI
+  }
 }
 ```
 
-**Error Type Colors:**
-- Rate limit: Amber (warning)
-- Context overflow: Blue (informational)
-- Network/Auth/Generic: Red (error)
+### Notes
+- This is a types-only file - no implementation code
+- WebSocket client will use these types for serialization/deserialization
+- Event mapper will convert RPC events to unified SessionEvent types
+- Extension UI types included for future feature support
 
-**Error Type Behaviors:**
-- Rate limit: Shows countdown timer, auto-retries when countdown reaches 0, optional Cancel button
-- Network: Shows Retry button
-- Context overflow: No action (auto-compacting message)
-- Auth: Shows dismiss X button
-- Generic: Shows dismiss X button with custom message
+---
 
-**Icons (from lucide):**
-- Rate limit: Clock
-- Network: WifiOff
-- Context overflow: Database
-- Auth: Key
-- Generic: AlertCircle
+## Task 52: Define connection profile types - Completed
 
-**Countdown Timer:**
-- Uses `willUpdate` lifecycle to start countdown when `retryAfter` property changes
-- Uses `setInterval` with 1-second ticks
-- Clears interval on disconnect and when countdown completes
-- Calls `onRetry` callback when countdown reaches 0
-
-**Accessibility:**
-- Uses `role="alert"` for screen reader announcement
-- Uses `aria-live="assertive"` for network/auth errors, `polite` for others
-- Dismiss buttons have `aria-label="Dismiss"`
-
-### Validation Output
-- `npm run check`: PASSED (no errors)
-- Biome lint: Checked 414 files, fixed 1 file (auto-formatted)
-- TypeScript: clean
-
-### Usage
-```typescript
-// Rate limit with countdown
-<pi-error-banner
-  type="rate-limit"
-  .retryAfter=${60}
-  .onRetry=${() => retry()}
-  .onDismiss=${() => cancel()}
-></pi-error-banner>
-
-// Network error with retry
-<pi-error-banner
-  type="network"
-  .onRetry=${() => reconnect()}
-></pi-error-banner>
-
-// Context overflow (auto-compacting)
-<pi-error-banner type="context-overflow"></pi-error-banner>
-
-// Generic error
-<pi-error-banner
-  type="generic"
-  message="Failed to load session"
-  .onDismiss=${() => dismiss()}
-></pi-error-banner>
-```
-
-
-## Settings Preferences Tab - Completed
-
-### Task
-Add a preferences tab to settings: default model, default thinking level, theme preference, sidebar collapsed by default.
+### Files Created
+- `packages/web-ui/src/networking/connection-types.ts` - Connection profile and state types
 
 ### Files Modified
+- `packages/web-ui/src/index.ts` - Added exports for connection types
 
-**packages/web-ui/src/storage/stores/settings-store.ts:**
-- Added `ThemePreference` type export (`"light" | "dark" | "system"`)
-- Added import for `ThinkingLevel` from `@mariozechner/pi-agent-core`
-- Added preference helper methods:
-  - `getDefaultModel()` / `setDefaultModel(modelId: string | null)`
-  - `getDefaultThinkingLevel()` / `setDefaultThinkingLevel(level: ThinkingLevel)`
-  - `getThemePreference()` / `setThemePreference(theme: ThemePreference)`
-  - `getSidebarCollapsed()` / `setSidebarCollapsed(collapsed: boolean)`
-- `setThemePreference` also updates `localStorage.theme` for mini-lit ThemeToggle compatibility and applies theme via `applyTheme()` private method
+### Types Defined
 
-**packages/web-ui/src/dialogs/SettingsDialog.ts:**
-- Added imports: `Button`, `Select`, `ThinkingLevel`, `getModels`, `Model`, `ThemePreference`
-- Added `PreferencesTab` class (`@customElement("preferences-tab")`) with:
-  - State: `defaultModel`, `defaultThinkingLevel`, `themePreference`, `sidebarCollapsed`, `allModels`
-  - `connectedCallback` loads preferences and models from all providers
-  - Save methods for each preference that update UI state and persist to storage
-  - Render method with:
-    - Default Model: Select dropdown with "Use last selected" + all available models
-    - Default Thinking Level: Select dropdown with Off/Minimal/Low/Medium/High/Extra High
-    - Theme: Three buttons (Light/Dark/System) with active state styling
-    - Sidebar Collapsed: Switch toggle
+**ConnectionProfile:**
+- `id: string` - UUID for profile identification
+- `name: string` - Display name (e.g., "Work Laptop")
+- `url: string` - WebSocket URL (wss://...)
+- `token: string` - Auth token
+- `lastUsed: string` - ISO timestamp
+- `lastSessionPath?: string` - Last used session path (optional)
 
-**packages/web-ui/src/utils/i18n.ts:**
-- Added i18n interface keys and translations (EN/DE) for:
-  - "Preferences" / "Einstellungen"
-  - "Extra High" / "Sehr Hoch"
-  - "Use last selected" / "Zuletzt ausgewählt verwenden"
-  - "Default Model" / "Standardmodell"
-  - "Model used when starting a new chat" / "Modell, das beim Starten eines neuen Chats verwendet wird"
-  - "Default Thinking Level" / "Standard-Denkniveau"
-  - "Extended thinking level for reasoning models" / "Erweitertes Denkniveau für Reasoning-Modelle"
-  - "Theme" / "Design"
-  - "Light" / "Hell"
-  - "Dark" / "Dunkel"
-  - "System" / "System"
-  - "Choose your preferred color scheme" / "Wählen Sie Ihr bevorzugtes Farbschema"
-  - "Start with sidebar closed" / "Mit geschlossener Seitenleiste starten"
-  - "On desktop, collapse the sidebar by default" / "Auf dem Desktop die Seitenleiste standardmäßig einklappen"
+**ConnectionState:**
+- `'disconnected'` - Not connected
+- `'connecting'` - Connection in progress
+- `'connected'` - Connection active
+- `'reconnecting'` - Attempting to reconnect
 
-**packages/web-ui/src/index.ts:**
-- Added export for `PreferencesTab` from `./dialogs/SettingsDialog.js`
-- Added export for `ThemePreference` type from `./storage/stores/settings-store.js`
+**ConnectionOptions:**
+- `url: string` - WebSocket URL
+- `token: string` - Auth token
+- `sessionPath?: string` - Optional session path to load
+- `cwd?: string` - Optional working directory
+
+**ReconnectionConfig:**
+- `maxRetries: number` - Maximum reconnection attempts (default: 5)
+- `initialDelayMs: number` - Initial delay in ms (default: 1000)
+- `maxDelayMs: number` - Maximum delay in ms (default: 30000)
+- `backoffMultiplier: number` - Backoff multiplier (default: 2)
+
+### Design Decisions
+- ConnectionState is a union type representing the state machine
+- All types exported for use throughout web-ui package
+- ConnectionProfile includes lastUsed for sorting recently used profiles
+- ReconnectionConfig defaults match typical WebSocket reconnection patterns
 
 ### Validation Output
 - `npm run check`: PASSED (no errors)
-- Biome lint: Checked 414 files, no fixes needed
-- TypeScript: clean (main package and example)
+- Biome lint: Checked 432 files, fixed 1 file (unrelated)
+- TypeScript: clean (no errors)
+- All types properly exported from package index
 
 ### Usage
 ```typescript
-import { SettingsDialog, PreferencesTab, ApiKeysTab, ProxyTab } from '@mariozechner/pi-web-ui';
+import type {
+  ConnectionProfile,
+  ConnectionState,
+  ConnectionOptions,
+  ReconnectionConfig,
+} from "@mariozechner/pi-web-ui";
 
-// Open settings with preferences tab
-SettingsDialog.open([
-  new PreferencesTab(),
-  new ApiKeysTab(),
-  new ProxyTab(),
-]);
+// Create a profile
+const profile: ConnectionProfile = {
+  id: crypto.randomUUID(),
+  name: "Work Laptop",
+  url: "wss://example.com/ws",
+  token: "auth-token-123",
+  lastUsed: new Date().toISOString(),
+  lastSessionPath: "/sessions/session.json",
+};
+
+// Connect with options
+const options: ConnectionOptions = {
+  url: profile.url,
+  token: profile.token,
+  sessionPath: profile.lastSessionPath,
+};
+
+// Configure reconnection
+const reconnectionConfig: ReconnectionConfig = {
+  maxRetries: 10,
+  initialDelayMs: 2000,
+  maxDelayMs: 60000,
+  backoffMultiplier: 2,
+};
 ```
 
-### Persistence Keys
-Settings are stored in IndexedDB via SettingsStore with keys:
-- `preferences.defaultModel` - string (model ID)
-- `preferences.defaultThinkingLevel` - ThinkingLevel
-- `preferences.theme` - ThemePreference
-- `preferences.sidebarCollapsed` - boolean
+### Notes
+- Types-only file - no implementation logic
+- Designed for use with WebSocket client and connection management
+- ConnectionProfile suitable for storage in IndexedDB/localStorage
 
-## Final Polish and Cleanup - Completed
+---
 
-### Issues Found and Fixed
+## Task 53: Create basic WebSocket wrapper - Completed
 
-**Accessibility Improvements:**
-1. `Toast.ts` - Added i18n import and wrapped "Dismiss" aria-label with i18n()
-2. `ErrorBanner.ts` - Added i18n import and wrapped all UI strings:
-   - Error titles (Rate limit reached, Connection lost, etc.)
-   - Subtitles (Ready to retry, Unable to reach server, etc.)
-   - Button labels (Cancel, Retry, Dismiss)
-3. `SessionItem.ts` - Removed incorrect `role="option"` (was not inside listbox), added descriptive aria-label
+### Files Created
+- `packages/web-ui/src/networking/WebSocketClient.ts` - Minimal WebSocket wrapper class
 
-**i18n Additions:**
-Added the following translation keys to both interface and English/German translations:
-- Rate limit reached / Rate-Limit erreicht
-- Connection lost / Verbindung verloren
-- Context limit reached / Kontextlimit erreicht
-- Authentication failed / Authentifizierung fehlgeschlagen
-- Something went wrong / Etwas ist schiefgelaufen
-- Retrying in / Erneuter Versuch in
-- Ready to retry / Bereit zum erneuten Versuch
-- Unable to reach the server / Server nicht erreichbar
-- Compacting conversation to continue... / Komprimiere Konversation um fortzufahren...
-- Please check your API key / Bitte überprüfen Sie Ihren API-Schlüssel
-- An unexpected error occurred / Ein unerwarteter Fehler ist aufgetreten
-- Dismiss / Schließen
-- Retry / Wiederholen
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added exports for WebSocketClient and types
 
-### Animation Performance Review
-All animations use GPU-accelerated properties:
-- `AppLayout.ts`: Uses `transform: translateX()` with `transition-transform`
-- `SessionItem.ts`: Uses `transform: translateX()` for swipe-to-delete
-- `Toast.ts`: Uses `transform` and `opacity` with `transition-all`
-- Sidebar and artifacts panels: Use `transform` for slide animations
+### Implementation Details
 
-### Code Quality
-- No `any` types found in new code
-- All event listeners properly cleaned up in disconnectedCallback
-- No console.log statements in new components (existing ones in test-sessions.ts are intentional test data)
+**WebSocketClient Class:**
+- Constructor takes WebSocket URL
+- Private `ws: WebSocket | null` - Underlying WebSocket instance
+- Private `listeners: Set<WebSocketListener>` - Event subscribers
+- Private `_state: ConnectionState` - Connection state tracking
 
-### Verification
-- `npm run check` passes with no errors
-- No TODOs in new code
-- All components have proper accessibility attributes
+**Public Methods:**
+- `get state()` - Returns current ConnectionState
+- `connect()` - Opens WebSocket connection, sets state to 'connecting'
+- `disconnect()` - Closes connection, removes listeners, resets state
+- `send(data: string)` - Sends message, throws if not connected
+- `subscribe(listener: WebSocketListener)` - Adds listener, returns unsubscribe function
+
+**Event Types (WebSocketEvent):**
+- `{ type: 'open' }` - Connection established
+- `{ type: 'close'; code: number; reason: string }` - Connection closed
+- `{ type: 'error'; error: Event }` - WebSocket error occurred
+- `{ type: 'message'; data: string }` - Message received
+
+**Internal Handlers:**
+- `handleOpen()` - Sets state to 'connected', emits open event
+- `handleMessage()` - Emits message event with data string
+- `handleError()` - Emits error event
+- `handleClose()` - Sets state to 'disconnected', emits close event
+
+**Design Decisions:**
+- Uses bound arrow methods (`readonly`) for event handlers to ensure stable references
+- Prevents reconnection when already connecting/connected (guards in `connect()`)
+- No reconnection logic yet - explicit connect/disconnect only
+- Event emitter pattern using Set for efficient add/remove
+- All handlers removed before closing WebSocket to prevent memory leaks
+
+### Validation Output
+- `npm run check`: PASSED (no errors)
+- Biome lint: Checked 433 files, fixed 1 file (unrelated)
+- TypeScript: clean (no errors)
+- All exports added to package index
+
+### Usage
+```typescript
+import { WebSocketClient } from "@mariozechner/pi-web-ui";
+
+const client = new WebSocketClient("wss://example.com/ws");
+
+// Subscribe to events
+const unsubscribe = client.subscribe((event) => {
+  if (event.type === "open") {
+    console.log("Connected!");
+  } else if (event.type === "message") {
+    console.log("Received:", event.data);
+  } else if (event.type === "close") {
+    console.log("Closed:", event.code, event.reason);
+  } else if (event.type === "error") {
+    console.error("Error:", event.error);
+  }
+});
+
+// Connect
+client.connect();
+
+// Send message (only when connected)
+if (client.state === "connected") {
+  client.send(JSON.stringify({ type: "get_state" }));
+}
+
+// Disconnect
+client.disconnect();
+unsubscribe();
+```
+
+### Notes
+- Foundation for RPC communication - sends/receives JSON strings
+- State tracking prevents sending when disconnected
+- Event emission happens after WebSocket callbacks
+- Ready for extension with reconnection logic in future tasks
+
+## Task 54: Add reconnection logic to WebSocket [COMPLETED]
+
+### Implementation Details:
+- Added optional ReconnectionConfig to WebSocketClient constructor
+- Implemented automatic reconnection on close/error events
+- Exponential backoff: 1s → 2s → 4s → 8s → 16s → 30s (max)
+- Track reconnection attempt count with private state
+- Emit 'reconnecting' event with attempt number and delay
+- Emit 'reconnected' event on successful reconnection
+- Give up after maxRetries and emit 'failed' event
+- Added enableReconnection flag (default: true)
+
+### New Event Types:
+- { type: 'reconnecting'; attempt: number; delay: number }
+- { type: 'reconnected' }
+- { type: 'failed'; reason: string }
+
+### New Private State:
+- reconnectionConfig: ReconnectionConfig | null
+- enableReconnection: boolean
+- attemptCount: number
+- reconnectionTimer: ReturnType<typeof setTimeout> | null
+
+### Key Methods:
+- calculateBackoffDelay(): exponential backoff with max delay cap
+- attemptReconnection(): handles retry logic with timer management
+- handleOpen: emits 'reconnected' when state was 'reconnecting'
+
+### Validation:
+- npm run check: PASSED
+- No type errors
+- All biome checks passed
+
+---
+
+## Task 55: Add request/response correlation - Completed
+
+### Files Created
+- `packages/web-ui/src/networking/RPCClient.ts` - RPC client with request/response correlation
+
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added exports for RPCClient, RequestError, RequestTimeoutError, PendingRequest
+
+### Implementation Details
+
+**RPCClient Class:**
+- Wraps WebSocketClient and adds request/response correlation
+- Assigns unique IDs to commands using `crypto.randomUUID()`
+- Tracks pending requests in Map<id, PendingRequest>
+- Returns Promise<T> for request/response commands
+- Separately emits streaming events via event emitter pattern
+- Parses incoming messages as JSONL (one JSON object per line)
+- Default 30-second timeout for pending requests
+
+**Public Methods:**
+- `constructor(ws: WebSocketClient)` - Initialize with WebSocketClient instance
+- `sendCommand<T>(command: Omit<RPCCommand, 'id'>): Promise<T>` - Send command, wait for response
+- `subscribe(listener: (event: RPCEvent) => void): () => void` - Subscribe to streaming events
+- `disconnect()` - Clean up resources, reject all pending requests, close connection
+
+**Private Methods:**
+- `handleMessage(event: WebSocketEvent)` - Process incoming WebSocket messages
+- `isResponse(parsed: unknown): parsed is RPCResponse` - Type guard for responses
+- `isEvent(parsed: unknown): parsed is RPCEvent` - Type guard for events
+- `handleResponse(response: RPCResponse)` - Match response to pending request
+- `emitEvent(event: RPCEvent)` - Emit to all event listeners
+
+**Error Classes:**
+- `RequestTimeoutError` - Thrown when request exceeds 30s timeout
+- `RequestError` - Thrown when request fails or connection closes
+
+**PendingRequest Interface (exported):**
+- `resolve: (value: unknown) => void` - Resolve function for Promise
+- `reject: (error: Error) => void` - Reject function for Promise
+- `timeout: ReturnType<typeof setTimeout>` - Timeout timer reference
+
+**Message Processing Logic:**
+1. Split incoming data by newline (JSONL format)
+2. Parse each line as JSON
+3. If response has matching ID: resolve/reject pending Promise
+4. If event (no ID): emit to all event listeners
+5. Malformed JSON logged but ignored (doesn't crash)
+
+**Design Decisions:**
+- Command ID added client-side (server echoes it back in response)
+- Response with no matching ID ignored (avoids stale response issues)
+- Streaming events never have IDs, always emitted to listeners
+- Pending requests rejected on disconnect (no dangling Promises)
+- Event listeners errors caught and logged (doesn't affect other listeners)
+
+### Validation Output
+- `npm run check`: PASSED (no errors)
+- Biome lint: Checked 434 files, no fixes applied
+- TypeScript: clean (no errors)
+- All exports added to package index
+
+### Usage
+```typescript
+import { RPCClient } from "@mariozechner/pi-web-ui";
+
+// Create RPC client
+const rpc = new RPCClient(wsClient);
+
+// Subscribe to streaming events
+const unsubscribe = rpc.subscribe((event) => {
+  if (event.type === "message_update") {
+    // Handle streaming updates
+  } else if (event.type === "agent_end") {
+    // Handle completion
+  }
+});
+
+// Send command and wait for response
+try {
+  const state = await rpc.sendCommand<RPCSessionState>({ type: "get_state" });
+  console.log("Current model:", state.model);
+} catch (error) {
+  if (error instanceof RequestTimeoutError) {
+    console.error("Request timed out");
+  } else if (error instanceof RequestError) {
+    console.error("Request failed:", error.message);
+  }
+}
+
+// Cleanup
+unsubscribe();
+rpc.disconnect();
+```
+
+### Notes
+- WebSocketClient message listener stored in instance for cleanup
+- Type-safe sendCommand with generic parameter for response type
+- 30-second timeout is configurable (change DEFAULT_REQUEST_TIMEOUT constant)
+- JSONL parsing handles multiple objects per message chunk
+- Ready for use with RemoteSessionMode implementation
+
+---
+
+## Task 56: Create basic RPC event mapper - Completed
+
+### Files Created
+- `packages/web-ui/src/networking/RPCEventMapper.ts` - RPC event to SessionEvent mapper
+
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added exports for RPCEventMapper and SessionEvent
+
+### Implementation Details
+
+**RPCEventMapper Class:**
+- Maps RPC events to UI-friendly SessionEvent types
+- Event emitter pattern with Set-based subscription
+- Basic lifecycle event mapping (no streaming deltas yet)
+- Error isolation in listeners (one listener error doesn't affect others)
+
+**SessionEvent Types (UI-friendly):**
+- `session_start` - Emitted when agent_start received
+- `session_end` - Emitted when agent_end received (includes all messages)
+- `message_start` - Emitted when message_start received (includes messageId and role)
+- `message_end` - Emitted when message_end received
+- `message_update` - For streaming deltas (placeholder for Task 57)
+- `turn_start` - Emitted when turn_start received
+- `turn_end` - Emitted when turn_end received (includes message and toolResults)
+- `tool_start` - Emitted when tool_execution_start received
+- `tool_update` - For partial tool results (placeholder for future task)
+- `tool_end` - Emitted when tool_execution_end received (includes result)
+
+**Event Mappings (this task):**
+- `agent_start` → `session_start`
+- `agent_end` → `session_end` with messages
+- `turn_start` → `turn_start`
+- `turn_end` → `turn_end` with message and toolResults
+- `message_start` → `message_start` with messageId and role
+- `message_end` → `message_end` with messageId
+- `tool_execution_start` → `tool_start` with toolCallId and toolName
+- `tool_execution_end` → `tool_end` with toolCallId and result
+
+**Not Yet Mapped (future tasks):**
+- `message_update` → `message_update` (Task 57: streaming deltas)
+- `tool_execution_update` → `tool_update` (future: partial tool results)
+- `auto_compaction_start/end` - informational events (no SessionEvent mapping planned)
+- `auto_retry_start/end` - informational events (no SessionEvent mapping planned)
+- `hook_error` - informational events (no SessionEvent mapping planned)
+
+**Public Methods:**
+- `handleEvent(rpcEvent: RPCEvent)` - Process incoming RPC event, emit SessionEvent(s)
+- `subscribe(listener: (event: SessionEvent) => void): () => void` - Subscribe, returns unsubscribe function
+
+**Private Methods:**
+- `handleAgentStart()` - Maps to session_start
+- `handleAgentEnd()` - Maps to session_end
+- `handleTurnStart()` - Maps to turn_start
+- `handleTurnEnd()` - Maps to turn_end
+- `handleMessageStart()` - Maps to message_start with messageId/role
+- `handleMessageEnd()` - Maps to message_end with messageId
+- `handleToolExecutionStart()` - Maps to tool_start
+- `handleToolExecutionEnd()` - Maps to tool_end
+- `emit(event: SessionEvent)` - Emit to all listeners with error isolation
+- `getMessageId(message: AgentMessage)` - Generate stable message ID from role/timestamp
+
+**Design Decisions:**
+- SessionEvent uses discriminated union for type safety
+- Message IDs generated from role + timestamp (or fallback to role + Date.now())
+- CurrentMessage state tracking deferred to Task 57 (when streaming deltas are implemented)
+- Listener errors caught and logged (doesn't crash other listeners)
+- Unmapped informational events silently ignored (not an error)
+
+### Validation Output
+- `npm run check`: PASSED (no errors)
+- Biome lint: Checked 435 files, no issues
+- TypeScript: clean (no errors)
+- All exports added to package index
+
+### Usage
+```typescript
+import { RPCEventMapper, RPCClient } from "@mariozechner/pi-web-ui";
+
+// Create mapper
+const mapper = new RPCEventMapper();
+
+// Subscribe to UI events
+const unsubscribe = mapper.subscribe((event) => {
+  if (event.type === "session_start") {
+    console.log("Session started");
+  } else if (event.type === "message_start") {
+    console.log(`Message started: ${event.role}`);
+  } else if (event.type === "turn_end") {
+    console.log("Turn completed with", event.toolResults.length, "tool results");
+  }
+});
+
+// Feed RPC events from RPCClient into mapper
+rpc.subscribe((rpcEvent) => {
+  mapper.handleEvent(rpcEvent);
+});
+
+// Cleanup
+unsubscribe();
+```
+
+### Notes
+- Streaming delta handling (message_update) comes in Task 57
+- Message ID generation may be improved if RPC protocol adds explicit IDs
+- Auto-compaction, auto-retry, and hook_error events are informational only
+- Event mapper is stateless except for listener subscription management
+## Task 57: Add streaming delta accumulation - COMPLETED
+
+**What was done:**
+- Added current message state tracking to RPCEventMapper:
+  - `currentMessageId`: Tracks the ID of the message being accumulated
+  - `currentMessage`: Holds the base AssistantMessage being built
+  - `currentContent`: Maps contentIndex to accumulated content blocks (TextContent, ThinkingContent, ToolCall)
+  - `toolCallArgs`: Accumulates JSON fragments for tool call arguments
+
+- Implemented `handleMessageUpdate()` method that:
+  - Processes `text_delta` events: appends text to content[contentIndex]
+  - Processes `thinking_delta` events: appends to thinking content
+  - Processes `toolcall_delta` events: accumulates JSON fragments
+  - Processes `toolcall_end` events: finalizes tool call with complete data
+  - Emits `message_update` SessionEvent with accumulated message and delta
+
+- Added helper methods for delta accumulation:
+  - `appendText()`: Creates/updates TextContent blocks
+  - `appendThinking()`: Creates/updates ThinkingContent blocks
+  - `appendToolCallArgs()`: Accumulates JSON fragments for tool arguments
+  - `finalizeToolCall()`: Converts RPCToolCall to ToolCall format and stores
+  - `buildMessage()`: Constructs accumulated message from current content blocks
+
+- Updated lifecycle handlers:
+  - `handleMessageStart()`: Initializes streaming state for assistant messages
+  - `handleMessageEnd()`: Clears streaming state when message completes
+
+- Connected `handleMessageUpdate()` in the `handleEvent()` switch statement
+
+**Files modified:**
+- `packages/web-ui/src/networking/RPCEventMapper.ts`
+
+**Verification:**
+- `npm run check` passes (no errors, no warnings)
+
+---
+
+## Task 58: Add tool execution event mapping - Completed
+
+### Files Modified
+- `packages/web-ui/src/networking/RPCEventMapper.ts` - Added tool execution update event handling
+
+### Implementation Details
+
+**Added Import:**
+- `RPCToolExecutionUpdateEvent` - Imported from rpc-types.ts
+
+**New Handler Method:**
+- `handleToolExecutionUpdate(event: RPCToolExecutionUpdateEvent): void`
+  - Extracts `toolCallId` and `partialResult` from the event
+  - Emits `tool_update` SessionEvent with:
+    - `toolCallId`: The ID of the tool being executed
+    - `partialResult`: The accumulated partial result from the event
+
+**Event Flow:**
+```
+tool_execution_start → tool_start (already mapped)
+tool_execution_update → tool_update (new in this task)
+tool_execution_end → tool_end (already mapped)
+```
+
+**Updated Switch Case:**
+- Changed `tool_execution_update` case from TODO comment to actual handler call
+- Now calls `this.handleToolExecutionUpdate(rpcEvent)`
+
+### Validation Output
+- `npm run check`: PASSED (no errors)
+- Biome lint: Checked 435 files, no fixes applied
+- TypeScript: clean (no errors)
+
+### Usage
+```typescript
+mapper.subscribe((event) => {
+  if (event.type === "tool_update") {
+    console.log(`Tool ${event.toolCallId} partial result:`, event.partialResult);
+    // Display partial output to user while tool is running
+  }
+});
+```
+
+### Notes
+- The `partialResult` contains `RPCToolResult` with:
+  - `content`: Array of content blocks (text or image)
+  - `details`: Optional details about truncation/fullOutputPath
+- UI components can now display live tool output as it accumulates
+- This completes the tool execution event mapping (start/update/end)
+
+---
+
+## Task 59: Create connection profiles store - Completed
+
+### Files Created
+- `packages/web-ui/src/storage/stores/connections-store.ts` - IndexedDB store for ConnectionProfile objects
+
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added export for ConnectionsStore
+
+### Implementation Details
+
+**ConnectionsStore Class:**
+- Extends base Store class following existing store patterns
+- Stores ConnectionProfile objects with CRUD operations
+- Uses IndexedDB with in-line keys (keyPath: "id")
+- Includes index on "url" field for efficient lookups
+
+**Store Configuration:**
+- Store name: "connections"
+- Key path: "id" (in-line key from ConnectionProfile.id)
+- Index: "url" (non-unique) - allows finding profiles by URL
+
+**Public Methods:**
+- `async add(profile: ConnectionProfile): Promise<void>` - Add a new profile
+- `async get(id: string): Promise<ConnectionProfile | null>` - Get profile by ID
+- `async getAll(): Promise<ConnectionProfile[]>` - Get all profiles
+- `async update(profile: ConnectionProfile): Promise<void>` - Update existing profile
+- `async delete(id: string): Promise<void>` - Delete profile by ID
+- `async getByUrl(url: string): Promise<ConnectionProfile | null>` - Find profile by URL
+
+**Implementation Pattern:**
+- Uses `getBackend().set()` for add/update operations
+- Uses `getBackend().get()` for single profile retrieval
+- Uses `getBackend().keys()` + loop for getAll() (iterates all keys)
+- Uses `getBackend().delete()` for deletion
+- getByUrl() fetches all profiles and filters by URL
+
+**Design Decisions:**
+- Follows existing store patterns (CustomProvidersStore, ProviderKeysStore)
+- Uses in-line keyPath (ConnectionProfile.id) for storage
+- add() and update() are aliases (both use set() - ID in object)
+- getByUrl() scans all profiles (acceptable for small profile counts)
+- Returns null for not-found (consistent with other stores)
+
+### Validation Output
+- `npm run check`: PASSED (no errors)
+- Biome lint: Checked 436 files, no issues
+- TypeScript: clean (no errors)
+- All exports added to package index
+
+### Usage
+```typescript
+import { ConnectionsStore } from "@mariozechner/pi-web-ui";
+
+// Create store
+const store = new ConnectionsStore();
+
+// Add a profile
+await store.add({
+  id: crypto.randomUUID(),
+  name: "Work Laptop",
+  url: "wss://example.com/ws",
+  token: "auth-token-123",
+  lastUsed: new Date().toISOString(),
+  lastSessionPath: "/sessions/session.json",
+});
+
+// Get by ID
+const profile = await store.get(profileId);
+
+// Get all profiles
+const allProfiles = await store.getAll();
+
+// Update a profile
+profile.lastUsed = new Date().toISOString();
+await store.update(profile);
+
+// Delete a profile
+await store.delete(profileId);
+
+// Find by URL
+const found = await store.getByUrl("wss://example.com/ws");
+```
+
+### Notes
+- Store must be initialized with backend before use (via setBackend())
+- DB version will need to be incremented when integrating this store
+- The "url" index allows efficient lookups if needed in future
+- Note: The example app's DB version is currently 2; this store will require version 3
+
+---
+
+## Task 60: Create connection profiles dialog - Completed
+
+### Files Created
+- `packages/web-ui/src/dialogs/ConnectionsDialog.ts` - Modal dialog for managing connection profiles
+
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added export for ConnectionsDialog component
+- `packages/web-ui/src/storage/app-storage.ts` - Added ConnectionsStore to AppStorage
+- `packages/web-ui/src/utils/i18n.ts` - Added i18n translations for connections dialog
+- `packages/web-ui/example/src/main.ts` - Integrated ConnectionsStore into app initialization
+
+### Implementation Details
+
+**ConnectionsDialog Component:**
+- Extends DialogBase for modal dialog functionality
+- Supports three views: list, add, edit
+- Lists all saved connection profiles sorted by lastUsed (descending)
+- Each profile card shows:
+  - Name, URL, and last used date
+  - Connect, Edit, and Delete buttons
+- Add/Edit form with:
+  - Name input
+  - URL input
+  - Token input (password type)
+- Confirm dialog before deleting profiles
+- Updates lastUsed timestamp on connect
+- Uses Monitor icon from lucide
+
+**Static API:**
+- `ConnectionsDialog.open(onConnect: (profile: ConnectionProfile) => void)` - Opens the dialog
+
+**State Management:**
+- `view: View` - Current view (list/add/edit)
+- `profiles: ConnectionProfile[]` - List of saved profiles
+- `editingProfile: ConnectionProfile | null` - Profile being edited
+- `formName`, `formUrl`, `formToken` - Form field values
+
+**Key Methods:**
+- `loadProfiles()` - Fetches all profiles from ConnectionsStore
+- `showAddForm()` - Switches to add form view
+- `showEditForm(profile)` - Populates edit form with profile data
+- `handleDelete(profile, event)` - Deletes profile with confirmation
+- `handleConnect(profile, event)` - Updates lastUsed and calls callback
+- `handleSave()` - Saves new or edited profile
+- `handleCancel()` - Returns to list view
+
+**AppStorage Update:**
+- Added `readonly connections: ConnectionsStore` property
+- Updated constructor to accept ConnectionsStore parameter
+- Constructor signature now has 6 arguments (was 5)
+
+**i18n Keys Added:**
+- "Server Connections" / "Serververbindungen"
+- "Add Connection" / "Verbindung hinzufügen"
+- "Edit Connection" / "Verbindung bearbeiten"
+- "Are you sure you want to delete this connection?" / "Sind Sie sicher, dass Sie diese Verbindung löschen möchten?"
+- "No connections yet" / "Noch keine Verbindungen"
+- "Last used" / "Zuletzt verwendet"
+- Name / "Name"
+- URL / "URL"
+- Token / "Token"
+- "Enter auth token" / "Auth-Token eingeben"
+- "Failed to save connection" / "Fehler beim Speichern der Verbindung"
+- "e.g., Work Server" / "z.B. Arbeitsserver"
+- Connect / "Verbinden"
+
+**Example App Integration:**
+- Created ConnectionsStore instance
+- Added connections config to IndexedDB setup
+- Updated DB version from 2 to 3 (for connections store)
+- Wired connections store to backend
+- Passed connections to AppStorage constructor
+
+### Dialog Layouts
+
+**List View:**
+```
+┌───────────────────────────────────────┐
+│ Server Connections                [×] │
+├───────────────────────────────────────┤
+│ ┌─────────────────────────────────┐   │
+│ │ 🖥️ Work Server                  │   │
+│ │ wss://work.example.com:8080     │   │
+│ │ Last used: Jan 15, 2026         │   │
+│ │ [Connect] [Edit] [Delete]       │   │
+│ └─────────────────────────────────┘   │
+│                                       │
+│ [+ Add Connection]                [Close] │
+└───────────────────────────────────────┘
+```
+
+**Form View:**
+```
+┌───────────────────────────────────────┐
+│ Add Connection                    [×] │
+├───────────────────────────────────────┤
+│ Name                                  │
+│ ┌─────────────────────────────────┐   │
+│ │ Work Server                     │   │
+│ └─────────────────────────────────┘   │
+│                                       │
+│ URL                                   │
+│ ┌─────────────────────────────────┐   │
+│ │ wss://work.example.com:8080     │   │
+│ └─────────────────────────────────┘   │
+│                                       │
+│ Token                                 │
+│ ┌─────────────────────────────────┐   │
+│ │ ••••••••••••                    │   │
+│ └─────────────────────────────────┘   │
+│                                       │
+│                    [Cancel] [Save]    │
+└───────────────────────────────────────┘
+```
+
+### Validation Output
+- `npm run check`: PASSED (no errors, no warnings)
+- Biome lint: Checked 107 files (web-ui), 7 files (example)
+- TypeScript: clean (no errors)
+- All exports added to package index
+
+### Usage
+```typescript
+import { ConnectionsDialog } from "@mariozechner/pi-web-ui";
+
+// Open dialog
+ConnectionsDialog.open((profile) => {
+  console.log("Connecting to:", profile.url, "with token:", profile.token);
+  // Connect to remote session using profile credentials
+});
+```
+
+### Notes
+- Dialog uses native `confirm()` for delete confirmation
+- Token input uses password type for security
+- Empty state shows "Add Connection" button when no profiles exist
+- Focus management: name input focused when entering add/edit forms
+- lastUsed timestamp updates automatically on connect
+- Modal width: min(500px, 90vw), height: min(600px, 90vh)
+
+---
+
+## Task 61: Create RemoteSessionAdapter shell - Completed
+
+### Files Created
+- `packages/web-ui/src/adapters/RemoteSessionAdapter.ts` - Basic adapter structure for remote session interaction
+
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added export for RemoteSessionAdapter
+
+### Implementation Details
+
+**RemoteSessionAdapter Class:**
+- Implements same interface pattern as browser Agent class
+- Delegates to remote session via RPCClient
+- Subscribes to RPC events through RPCEventMapper
+- Updates local state based on session events
+
+**Constructor:**
+- Takes `rpcClient: RPCClient` and `eventMapper: RPCEventMapper`
+- Stores references to both
+- Subscribes to event mapper to receive SessionEvent objects
+- Returns unsubscribe function for cleanup
+
+**State Properties (private with public getters):**
+- `_messages: AgentMessage[]` - Accumulated messages from session
+- `_model: string | null` - Current model being used
+- `_thinkingLevel: ThinkingLevel` - Current thinking level
+- `_isStreaming: boolean` - Whether streaming response is active
+
+**Public Getters:**
+- `get messages(): AgentMessage[]` - Returns accumulated messages
+- `get model(): string | null` - Returns current model
+- `get thinkingLevel(): ThinkingLevel` - Returns thinking level
+- `get isStreaming(): boolean` - Returns streaming state
+
+**Public Methods (stubs - implemented in subsequent tasks):**
+- `async sendPrompt(prompt: string): Promise<void>` - Send prompt (Task 62)
+- `async abort(): Promise<void>` - Abort streaming (Task 64)
+- `async setModel(modelId: string): Promise<void>` - Set model (Task 64)
+- `async setThinkingLevel(level: ThinkingLevel): Promise<void>` - Set thinking level (Task 64)
+- `async getState(): Promise<void>` - Get session state (Task 63)
+- `async getMessages(): Promise<AgentMessage[]>` - Get messages (Task 63)
+- `destroy(): void` - Cleanup resources (implemented)
+
+**Event Subscription:**
+- `subscribe(listener: (event: SessionEvent) => void): () => void` - Subscribe to session events
+- Events are re-emitted from event mapper to adapter listeners
+- Error isolation in listeners (one listener error doesn't affect others)
+
+**Private Methods:**
+- `handleEvent(event: SessionEvent): void` - Processes SessionEvent and updates state
+- `updateMessage(messageId: string, message: AgentMessage): void` - Updates message in local array
+- `emit(event: SessionEvent): void` - Emits event to all listeners
+- `getMessageId(message: AgentMessage): string` - Generates stable message ID
+
+**Event Handling Logic:**
+- `session_start` - Session initialized
+- `session_end` - Updates messages array, clears streaming flag
+- `message_start` - Sets streaming flag to true
+- `message_end` - Sets streaming flag to false
+- `message_update` - Updates message in local array
+- `turn_start` - New turn started
+- `turn_end` - Adds message and tool results to messages array, clears streaming flag
+- `tool_start` - Tool execution started
+- `tool_update` - Tool execution partial result
+- `tool_end` - Tool execution completed
+
+**Cleanup Method (destroy):**
+- Unsubscribes from event mapper
+- Clears all listeners
+- Prevents memory leaks
+
+**Design Decisions:**
+- Stub methods throw descriptive errors indicating which task will implement them
+- Unused parameters in stub methods prefixed with underscore (_prompt, _modelId, _level)
+- rpcClient accessed via getter to satisfy linter (will be used in subsequent tasks)
+- Message ID generation matches RPCEventMapper logic for consistency
+- Event listeners isolated with try-catch (one listener error doesn't crash others)
+
+### Validation Output
+- `npm run check`: PASSED (no errors, no warnings)
+- Biome lint: Checked 438 files (root), 108 files (web-ui), 7 files (example)
+- TypeScript: clean (no errors)
+- All exports added to package index
+
+### Usage
+```typescript
+import {
+  RemoteSessionAdapter,
+  RPCClient,
+  RPCEventMapper,
+  WebSocketClient,
+} from "@mariozechner/pi-web-ui";
+
+// Create WebSocket and RPC client
+const ws = new WebSocketClient("wss://example.com/ws");
+const rpcClient = new RPCClient(ws);
+const eventMapper = new RPCEventMapper();
+
+// Feed RPC events into mapper
+rpcClient.subscribe((rpcEvent) => {
+  eventMapper.handleEvent(rpcEvent);
+});
+
+// Create adapter
+const adapter = new RemoteSessionAdapter(rpcClient, eventMapper);
+
+// Subscribe to events
+const unsubscribe = adapter.subscribe((event) => {
+  if (event.type === "message_update") {
+    console.log("New message delta:", event.delta);
+  }
+});
+
+// Access state
+console.log("Current model:", adapter.model);
+console.log("Messages:", adapter.messages);
+console.log("Streaming:", adapter.isStreaming);
+
+// Cleanup when done
+unsubscribe();
+adapter.destroy();
+```
+
+### Notes
+- This is the shell/structure - actual RPC calls implemented in Tasks 62-64
+- Adapter provides unified interface for both browser and remote modes
+- State is updated reactively via events from event mapper
+- destroy() should be called when adapter is no longer needed to prevent memory leaks
+- Event mapper subscription is managed internally and cleaned up on destroy()
+
+## Task 62: Implement prompt command in adapter
+
+### Completed
+- Implemented `sendPrompt()` method in RemoteSessionAdapter.ts
+- Added `createUserMessage()` helper method to create UserMessage objects
+- Fixed type issue with RPCCommand by creating `RPCCommandWithoutId` type
+- Updated RPCClient.sendCommand() to use the new type
+
+### Files Changed
+- `packages/web-ui/src/adapters/RemoteSessionAdapter.ts`
+  - Implemented sendPrompt method: sets isStreaming=true, adds user message to local state, sends RPC command
+  - Added createUserMessage helper: creates UserMessage with role, content, and timestamp
+- `packages/web-ui/src/networking/rpc-types.ts`
+  - Added RPCCommandWithoutId type to handle Omit on discriminated unions
+- `packages/web-ui/src/networking/RPCClient.ts`
+  - Updated sendCommand signature to use RPCCommandWithoutId
+
+### Implementation Details
+The sendPrompt method:
+1. Sets `_isStreaming = true` to indicate streaming is active
+2. Creates a UserMessage from the prompt and adds it to local messages array
+3. Sends the `prompt` RPC command with the message content
+4. Returns immediately (response streaming happens via event mapper events)
+
+### Validation
+- npm run check passes (no errors)
+- Typecheck: clean
+
+## Task 63: Implement state sync in adapter - COMPLETED
+- File: packages/web-ui/src/adapters/RemoteSessionAdapter.ts
+- Implemented getState() method to fetch and sync session state (model, thinkingLevel, isStreaming)
+- Implemented getMessages() method to fetch and sync all messages
+- Both methods use RPCClient.sendCommand() to communicate with remote session
+- Validation: npm run check passed
+
+---
+
+## Task 64: Implement remaining adapter commands - Completed
+
+### Files Modified
+- `packages/web-ui/src/adapters/RemoteSessionAdapter.ts` - Implemented remaining adapter methods
+
+### Implementation Details
+
+**Changes to State Storage:**
+- Changed `_model` from `string | null` to `Model<any> | null` to store full model object
+- Updated `model` getter to return `model.id` for backwards compatibility
+- Updated `getState()` to store full model object instead of just ID
+
+**Implemented Methods:**
+
+1. **abort()** - Abort current streaming response
+   - Sends `abort` RPC command
+   - Sets `_isStreaming = false`
+
+2. **setModel(modelId: string)** - Set session model
+   - Queries available models via `get_available_models` RPC command
+   - Finds model matching modelId in results
+   - Sends `set_model` RPC command with provider and modelId
+   - Stores full Model object in `_model`
+   - Throws error if model not found
+
+3. **setThinkingLevel(level: ThinkingLevel)** - Set thinking level
+   - Sends `set_thinking_level` RPC command with level parameter
+   - Updates `_thinkingLevel` local state
+
+4. **newSession()** - Start new session
+   - Sends `new_session` RPC command
+   - Clears `_messages` array
+   - State will be updated via subsequent events
+
+5. **switchSession(sessionPath: string)** - Switch to different session
+   - Sends `switch_session` RPC command with sessionPath
+   - Calls `getState()` to sync session state
+   - Calls `getMessages()` to sync messages array
+
+**Added Import:**
+- `Model` type from `@mariozechner/pi-ai`
+
+### Design Notes
+- `setModel` queries available models to get provider information (required by RPC protocol)
+- `_model` stores full Model object to enable future features that need provider info
+- Public `model` getter returns just the ID for backwards compatibility with existing code
+- `switchSession` fully syncs state after switching (not relying only on events)
+
+### Validation Output
+- `npm run check`: PASSED (no errors, no warnings)
+- Biome lint: Checked 438 files (root), 108 files (web-ui), 7 files (example)
+- TypeScript: clean (no errors)
+
+### Usage
+```typescript
+// Abort streaming
+await adapter.abort();
+
+// Set model
+await adapter.setModel("anthropic:claude-sonnet-4-20250514");
+
+// Set thinking level
+await adapter.setThinkingLevel("medium");
+
+// Start new session
+await adapter.newSession();
+
+// Switch to different session
+await adapter.switchSession("/path/to/session.json");
+```
+
+### Notes
+- All adapter methods are now fully implemented (no more stubs)
+- RemoteSessionAdapter provides complete interface for remote session control
+- Ready for integration with RemoteSessionMode component
+
+---
+
+## Task 65: Enhance ConnectionStatus for remote mode - Completed
+
+### Files Modified
+- `packages/web-ui/src/components/ConnectionStatus.ts` - Extended component for remote mode support
+
+### Implementation Details
+
+**New Props:**
+- `mode: 'browser' | 'remote'` - Selects connection mode (default: 'browser')
+- `connectionState: ConnectionState` - Connection state for remote mode
+- `reconnectAttempt?: number` - Reconnection attempt number (optional)
+
+**New Type Export:**
+- `export type ConnectionState = "disconnected" | "connecting" | "connected" | "reconnecting"`
+
+**New Imports:**
+- `icon` from `@mariozechner/mini-lit` - For rendering lucide icons
+- `Wifi`, `WifiOff` from `lucide` - WiFi icons for remote mode
+
+**New Helper Methods:**
+- `renderWifiIcon(colorClass: string, pulseClass = "")` - Renders Wifi icon with optional pulse animation
+- `renderWifiOffIcon(colorClass: string)` - Renders WifiOff icon
+- `getRemoteStateInfo()` - Returns color class, pulse class, icon, and tooltip for each state
+
+**Remote Mode State Rendering:**
+- `disconnected` - Red WifiOff icon, "Disconnected" tooltip
+- `connecting` - Yellow Wifi icon with pulse animation, "Connecting..." tooltip
+- `connected` - Green Wifi icon, "Connected" tooltip
+- `reconnecting` - Yellow Wifi icon with pulse, "Reconnecting (attempt {n})..." tooltip
+
+**Browser Mode (unchanged):**
+- Still uses `navigator.onLine` for online/offline detection
+- Shows existing online (green) / offline (red) SVG icons
+
+**Updated render() Logic:**
+1. If `mode === 'remote'`: Use `getRemoteStateInfo()` to render state
+2. Otherwise: Fall back to original browser mode logic
+
+### i18n Keys Added
+
+**English:**
+- "Connecting..." - "Connecting..."
+- "Reconnecting..." - "Reconnecting..."
+- "Reconnecting (attempt {n})..." - "Reconnecting (attempt {n})..."
+
+**German:**
+- "Connecting..." - "Verbinde..."
+- "Reconnecting..." - "Verbinde erneut..."
+- "Reconnecting (attempt {n})..." - "Verbinde erneut (Versuch {n})..."
+
+**Existing keys reused:**
+- "Connected" (already existed)
+- "Disconnected" (already existed)
+
+### Validation Output
+- `npm run check`: PASSED (no errors, no warnings)
+- Biome lint: Checked 438 files (root), 108 files (web-ui), 7 files (example)
+- TypeScript: clean (no errors)
+
+### Usage
+
+**Browser mode (default - existing behavior):**
+```html
+<pi-connection-status></pi-connection-status>
+<!-- Shows online/offline based on navigator.onLine -->
+```
+
+**Remote mode:**
+```html
+<!-- Disconnected -->
+<pi-connection-status
+  mode="remote"
+  connectionState="disconnected"
+></pi-connection-status>
+
+<!-- Connecting -->
+<pi-connection-status
+  mode="remote"
+  connectionState="connecting"
+></pi-connection-status>
+
+<!-- Connected -->
+<pi-connection-status
+  mode="remote"
+  connectionState="connected"
+></pi-connection-status>
+
+<!-- Reconnecting -->
+<pi-connection-status
+  mode="remote"
+  connectionState="reconnecting"
+  reconnectAttempt="3"
+></pi-connection-status>
+```
+
+### Design Notes
+- Pulse animation (`animate-pulse`) added for connecting/reconnecting states
+- Wifi icons from lucide used for consistency with other components
+- Backward compatible - browser mode behavior unchanged
+- Template string replacement with `.replace()` for reconnect attempt number
+- Icon rendering uses `icon()` helper from mini-lit for consistent sizing
+
+### Files Changed
+- `packages/web-ui/src/components/ConnectionStatus.ts`
+- `packages/web-ui/src/utils/i18n.ts`
+
+---
+
+## Task 66: Remote Sessions Dialog
+
+### Summary
+Created a dialog component to browse and select remote sessions from a connected server.
+
+### Implementation Details
+
+#### Dialog Component (`RemoteSessionsDialog.ts`)
+- **Static open method**: Accepts `RPCClient`, `onSessionSelect` callback, and optional `onNewSession` callback
+- **Session fetching**: Uses `list_sessions` RPC command with graceful error handling
+- **Session display**: Shows first message preview (title), message count, and last modified date
+- **States**: Loading, error, empty, and populated states all handled
+- **Date formatting**: Smart relative dates (Today, Yesterday, X days ago, or full date)
+
+#### Interface Definition
+```typescript
+interface RemoteSession {
+  id: string;
+  title: string;
+  messageCount: number;
+  lastModified: string;
+  path: string;
+}
+```
+
+#### i18n Keys Added
+- `Remote Sessions`: English/German
+- `Failed to load sessions`: English/German
+- `No remote sessions yet`: English/German
+- `New Session`: English/German (reuses existing "New Chat" pattern)
+
+#### Error Handling
+- Handles missing `list_sessions` command gracefully (may not be implemented yet)
+- Shows error state with retry button
+- Empty state when no sessions exist
+- Type assertion (`as any`) for unimplemented RPC command
+
+### Files Changed
+- `packages/web-ui/src/dialogs/RemoteSessionsDialog.ts` (new)
+- `packages/web-ui/src/utils/i18n.ts` (added translations)
+- `packages/web-ui/src/index.ts` (exported dialog and types)
+
+### Validation
+- `npm run check` passes
+
+---
+
+## Task 67: Add session cache store - Completed
+
+### Files Created
+- `packages/web-ui/src/storage/stores/session-cache-store.ts` - IndexedDB store for caching remote session messages
+
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added exports for SessionCacheStore and CachedSession type
+
+### Data Structure
+
+**CachedSession Interface:**
+- `id: string` - Compound key: connectionId + "|" + sessionPath
+- `connectionId: string` - Connection profile ID
+- `sessionPath: string` - Server-side session path
+- `messages: AgentMessage[]` - Cached messages
+- `model: string | null` - Model used for this session
+- `thinkingLevel: string` - Thinking level used
+- `cachedAt: string` - ISO timestamp when cache was created/updated
+
+### Implementation Details
+
+**SessionCacheStore Class:**
+- Extends base Store class following existing store patterns
+- Stores CachedSession objects with CRUD operations
+- Uses IndexedDB with in-line keys (keyPath: "id")
+- Includes index on "connectionId" field for efficient lookups
+
+**Store Configuration:**
+- Store name: "session-cache"
+- Key path: "id" (in-line key from CachedSession.id)
+- Index: "connectionId" (non-unique) - allows finding sessions by connection
+
+**Public Methods:**
+
+1. **save(connectionId, sessionPath, session)** - Save or update a cached session
+   - Generates compound key: `${connectionId}|${sessionPath}`
+   - Adds/updates cachedAt timestamp (ISO format)
+   - Accepts session data without id/connectionId/sessionPath/cachedAt (auto-generated)
+
+2. **get(connectionId, sessionPath)** - Get a cached session
+   - Generates compound key
+   - Returns CachedSession or null if not found
+
+3. **getByConnection(connectionId)** - Get all cached sessions for a connection
+   - Fetches all sessions via connectionId index
+   - Filters results by connectionId
+   - Returns array of CachedSession objects
+
+4. **delete(connectionId, sessionPath)** - Delete a cached session
+   - Generates compound key
+   - Removes from store
+
+5. **deleteByConnection(connectionId)** - Delete all cached sessions for a connection
+   - Gets all sessions for connection
+   - Deletes each session individually
+
+6. **prune(maxAgeDays)** - Remove old cache entries
+   - Default maxAgeDays: 30
+   - Calculates cutoff date (current time - maxAgeDays)
+   - Deletes sessions with cachedAt older than cutoff
+   - Returns number of sessions deleted
+
+7. **getAll()** - Get all cached sessions
+   - Fetches all keys from store
+   - Iterates and retrieves each session
+   - Returns array of all CachedSession objects
+
+8. **clear()** - Clear all cached sessions
+   - Uses backend clear() to empty store
+
+**Private Helper Methods:**
+- `generateKey(connectionId, sessionPath)` - Creates compound key using "|" separator
+
+**Design Decisions:**
+- Compound key format: `${connectionId}|${sessionPath}` ensures uniqueness per connection
+- cachedAt timestamp always updated on save (enables pruning)
+- getByConnection uses index + filtering for correctness
+- prune() uses 30-day default (common cache retention period)
+- Follows existing store patterns (CustomProvidersStore, ConnectionsStore)
+- Imported AgentMessage from @mariozechner/pi-agent-core
+
+### Validation Output
+- `npm run check`: PASSED (no errors, no warnings)
+- Biome lint: Checked 440 files, fixed 2 files
+- TypeScript: clean (no errors)
+- All exports added to package index
+
+### Usage
+```typescript
+import { SessionCacheStore } from "@mariozechner/pi-web-ui";
+
+// Create store
+const store = new SessionCacheStore();
+
+// Save a session
+await store.save("conn-123", "/sessions/session.json", {
+  messages: [...],
+  model: "anthropic:claude-sonnet-4",
+  thinkingLevel: "medium",
+});
+
+// Get cached session
+const cached = await store.get("conn-123", "/sessions/session.json");
+if (cached) {
+  console.log("Cached at:", cached.cachedAt);
+  console.log("Messages:", cached.messages);
+}
+
+// Get all sessions for a connection
+const sessions = await store.getByConnection("conn-123");
+
+// Delete a session
+await store.delete("conn-123", "/sessions/session.json");
+
+// Delete all sessions for a connection
+await store.deleteByConnection("conn-123");
+
+// Prune old sessions (older than 30 days)
+const deletedCount = await store.prune(30);
+console.log(`Deleted ${deletedCount} old sessions`);
+
+// Get all cached sessions
+const all = await store.getAll();
+
+// Clear all caches
+await store.clear();
+```
+
+### Notes
+- Store must be initialized with backend before use (via setBackend())
+- DB version will need to be incremented when integrating this store
+- Compound key format uses "|" separator (unambiguous in paths)
+- Automatic cachedAt timestamp on every save ensures fresh metadata
+- Enables offline viewing of previously fetched remote sessions
+- Prune method prevents unbounded cache growth
+
+---
+
+## Task 68: Add compaction dialog - Completed
+
+### Files Created
+- `packages/web-ui/src/dialogs/CompactionDialog.ts` - Dialog for manually triggering context compaction
+
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added export for CompactionDialog component
+- `packages/web-ui/src/utils/i18n.ts` - Added i18n translations for compaction dialog
+
+### Implementation Details
+
+**CompactionDialog Component:**
+- Extends DialogBase for modal dialog functionality
+- Two views: form (initial) and result (after compaction)
+- Shows current token count and context limit
+- Optional instructions textarea for compaction hints
+- Visual progress bar showing percentage of context used
+- Loading state during compaction
+- Displays before/after token counts and savings after completion
+- Uses CheckCircle icon from lucide for success state
+
+**Static API:**
+- `CompactionDialog.open(currentTokens: number, maxTokens: number): Promise<CompactionResult | null>`
+  - Opens the dialog with current token usage
+  - Returns Promise that resolves with compaction result or null if cancelled
+
+**State Management:**
+- `currentTokens: number` - Current token count
+- `maxTokens: number` - Maximum token limit
+- `instructions: string` - User-provided compaction hints
+- `compacting: boolean` - Loading state during compaction
+- `result: CompactionResult | null` - Compaction result (before/after tokens)
+
+**Result Interface:**
+```typescript
+interface CompactionResult {
+  beforeTokens: number;
+  afterTokens: number;
+}
+```
+
+**Key Methods:**
+- `async handleCompact()` - Triggers compaction with 1s delay (simulated), sets result
+- `handleCancel()` - Closes dialog and resolves with null
+- `handleClose()` - Closes dialog and resolves with result (if any)
+- `renderForm()` - Renders initial form with token info and instructions
+- `renderResult()` - Renders success view with before/after stats
+- `formatNumber(num: number)` - Formats numbers with locale separators
+
+**Form View Features:**
+- Current tokens display with formatted number
+- Context limit display with formatted number
+- Progress bar showing percentage full (amber warning at high percentages)
+- Optional instructions textarea with placeholder hint
+- Cancel and Compact buttons (Compact disabled during loading)
+
+**Result View Features:**
+- Success banner with green background and checkmark icon
+- Before token count
+- After token count
+- Saved tokens count and percentage reduction
+- Close button
+
+**i18n Keys Added:**
+
+**English:**
+- "Compact Conversation" / "Compact Conversation"
+- "Current tokens" / "Current tokens"
+- "Context limit" / "Context limit"
+- "Instructions (optional)" / "Instructions (optional)"
+- "Focus on the recent discussion about authentication..." / "Focus on the recent discussion about authentication..."
+- "Compacting" / "Compacting..."
+- "Compact" / "Compact"
+- "Compaction complete!" / "Compaction complete!"
+- "Before" / "Before"
+- "After" / "After"
+- "Saved" / "Saved"
+
+**German:**
+- "Compact Conversation" / "Konversation komprimieren"
+- "Current tokens" / "Aktuelle Tokens"
+- "Context limit" / "Kontextlimit"
+- "Instructions (optional)" / "Anweisungen (optional)"
+- "Focus on the recent discussion about authentication..." / "Fokus auf die aktuelle Diskussion über Authentifizierung..."
+- "Compacting" / "Komprimiere..."
+- "Compact" / "Komprimieren"
+- "Compaction complete!" / "Komprimierung abgeschlossen!"
+- "Before" / "Vorher"
+- "After" / "Nachher"
+- "Saved" / "Gespart"
+
+### Dialog Layouts
+
+**Form View:**
+```
+┌───────────────────────────────────────┐
+│ Compact Conversation              [×] │
+├───────────────────────────────────────┤
+│                                       │
+│ Current tokens: 125,432               │
+│ Context limit: 200,000                │
+│ ███████████████░░░░░░░░ 63%          │
+│                                       │
+│ Instructions (optional)               │
+│ ┌─────────────────────────────────┐   │
+│ │ Focus on the recent discussion │   │
+│ │ about authentication...         │   │
+│ └─────────────────────────────────┘   │
+│                                       │
+│                   [Cancel] [Compact]  │
+└───────────────────────────────────────┘
+```
+
+**Result View:**
+```
+┌───────────────────────────────────────┐
+│ Compact Conversation              [×] │
+├───────────────────────────────────────┤
+│                                       │
+│ ✓ Compaction complete!                │
+│                                       │
+│ Before: 125,432 tokens                │
+│ After: 45,678 tokens                  │
+│ Saved: 79,754 tokens (64%)            │
+│                                       │
+│                              [Close]  │
+└───────────────────────────────────────┘
+```
+
+### Validation Output
+- `npm run check`: PASSED (no errors, no warnings)
+- Biome lint: Checked 441 files, fixed 1 file
+- TypeScript: clean (no errors)
+- All exports added to package index
+
+### Usage
+```typescript
+import { CompactionDialog } from "@mariozechner/pi-web-ui";
+
+// Open dialog
+const result = await CompactionDialog.open(125432, 200000);
+
+if (result) {
+  console.log("Compaction successful:");
+  console.log("Before:", result.beforeTokens);
+  console.log("After:", result.afterTokens);
+  console.log("Saved:", result.beforeTokens - result.afterTokens);
+} else {
+  console.log("User cancelled compaction");
+}
+```
+
+### Notes
+- Compaction is simulated with 1s delay and 40% reduction (real implementation will use actual RPC command)
+- Modal width: min(500px, 90vw), height: auto
+- Progress bar color uses standard primary color
+- Success banner uses success color variants (bg-success/10, border-success/20, text-success)
+- Number formatting uses `Intl.NumberFormat()` for locale-aware separators
+- Dialog resolves with null if user clicks Cancel or X before compaction
+- Dialog resolves with result after showing success view when user clicks Close
+- Textarea has resize-y class for vertical resizing only
+- All buttons disabled during compaction to prevent duplicate requests
+
+## Task 69: Add fork indicator component - Completed
+
+### Files Created
+- `packages/web-ui/src/components/ForkIndicator.ts` - Indicator component showing session forks with dropdown menu
+
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added exports for ForkIndicator, ForkBranch, and SwitchBranchEvent
+- `packages/web-ui/src/utils/i18n.ts` - Added i18n translations for fork indicator
+
+### Implementation Details
+
+**ForkIndicator Component:**
+- Extends LitElement as a small indicator component
+- Shows GitBranch icon when session has forks
+- Click icon to toggle dropdown/popover showing fork branches
+- Each branch shows: branch name, preview text, and fork point
+- Click branch to switch (emits custom event)
+- Visual indication of current branch with "current" badge
+- Click outside to close dropdown
+
+**Props:**
+- `hasForks: boolean` - Whether session has forks (controls visibility)
+- `branches: ForkBranch[]` - Array of branch information
+- `currentBranchId: string` - ID of currently selected branch
+
+**ForkBranch Interface:**
+```typescript
+interface ForkBranch {
+  id: string;
+  name: string;
+  preview: string;
+  forkPoint: number; // message index where fork occurred
+}
+```
+
+**Custom Event:**
+- Emits `SwitchBranchEvent` with branchId when user selects a branch
+- Event bubbles and is composed for parent component handling
+
+**State Management:**
+- `isDropdownOpen` - Controls dropdown visibility
+- Click outside handler for closing dropdown
+- Bound event handler for proper cleanup in disconnectedCallback
+
+**Key Methods:**
+- `toggleDropdown()` - Opens/closes dropdown, manages click outside listener
+- `handleClickOutside(e)` - Closes dropdown when clicking outside
+- `handleBranchClick(branchId)` - Emits SwitchBranchEvent, closes dropdown
+- `renderDropdown()` - Renders branch list with current branch indicator
+- `gitBranchIcon()` - Renders inline SVG GitBranch icon from lucide
+
+**Dropdown Features:**
+- Right-aligned, below the trigger button
+- Minimum width 200px, max width 300px
+- Each branch shows name (truncated), preview (truncated), and fork point
+- Current branch highlighted with bg-accent/50 and "current" badge
+- Hover states for all branch items
+- Empty state when no branches exist
+
+**i18n Keys Added:**
+
+**English:**
+- "Fork branches" - "Fork branches"
+- "No branches yet" - "No branches yet"
+- "Fork at message {number}" - "Fork at message {number}"
+- "View fork branches" - "View fork branches"
+
+**German:**
+- "Fork branches" - "Verzweigungen"
+- "No branches yet" - "Noch keine Verzweigungen"
+- "Fork at message {number}" - "Verzweigt bei Nachricht {number}"
+- "View fork branches" - "Verzweigungen anzeigen"
+
+**Design Notes:**
+- GitBranch icon is inline SVG (from lucide) for consistency
+- Reuses existing "current" i18n key from Artifacts feature
+- Uses standard mini-lit/Lit patterns (@customElement, @property, @state)
+- Dropdown uses z-50 to stay on top of other elements
+- Button has hover:bg-accent transition for visual feedback
+- ARIA attributes: aria-label, aria-expanded, aria-haspopup, role="menu"
+- Fork point displays as 1-indexed (message number, not index)
+
+### Component Layout
+
+**Indicator (visible when hasForks):**
+```
+[GitBranch Icon]
+```
+
+**Dropdown (open state):**
+```
+┌──────────────────────────────┐
+│ Main Branch     [current]  │
+│ User: Hello there...        │
+│ Fork at message 5           │
+├──────────────────────────────┤
+│ Alternative Branch         │
+│ User: Let's explore...      │
+│ Fork at message 8           │
+└──────────────────────────────┘
+```
+
+### Validation Output
+- `npm run check`: PASSED (no errors, no warnings)
+- Biome lint: Checked 112 files (web-ui), 7 files (example)
+- TypeScript: clean (no errors)
+- All exports added to package index
+
+### Usage
+```typescript
+import { ForkIndicator, type ForkBranch } from "@mariozechner/pi-web-ui";
+
+const branches: ForkBranch[] = [
+  {
+    id: "main",
+    name: "Main Branch",
+    preview: "User: Hello there...",
+    forkPoint: 0,
+  },
+  {
+    id: "alt-1",
+    name: "Alternative Branch",
+    preview: "User: Let's explore a different path...",
+    forkPoint: 5,
+  },
+];
+
+// Render component
+html`
+  <fork-indicator
+    ?hasForks="${branches.length > 0}"
+    .branches="${branches}"
+    currentBranchId="${currentBranch}"
+    @switch-branch="${(e: SwitchBranchEvent) => this.handleSwitchBranch(e.detail.branchId)}"
+  ></fork-indicator>
+`;
+
+// Handle branch switch
+private handleSwitchBranch(branchId: string) {
+  console.log("Switching to branch:", branchId);
+  // Switch to the selected branch
+}
+```
+
+### Notes
+- Component only renders when `hasForks` is true
+- Dropdown automatically positions right-aligned and below trigger
+- Click outside functionality properly added/removed in lifecycle callbacks
+- Fork point is displayed as message number (index + 1) for user friendliness
+- Event is composed and bubbles for easy parent component handling
+- All ARIA attributes for accessibility support
+Task 70: Document server requirements - COMPLETED
+
+## Task 71: Add service worker for asset caching - COMPLETED
+
+### Files Created
+- `packages/web-ui/example/public/sw.js` - Service worker for offline asset caching
+- `packages/web-ui/src/utils/sw-register.ts` - Service worker registration utility
+
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added service worker exports
+
+### Implementation Details
+
+**Service Worker (sw.js):**
+- Cache name: `pi-web-ui-v1` (version-based for invalidation)
+- Precaches static assets on install: `/`, `/index.html`
+- Two caching strategies:
+  - **Cache-first**: JS, CSS, fonts, images (rarely changing)
+  - **Network-first**: API calls (`/api/*`, `/socket/*`) and other requests
+- Automatically cleans old caches on activate
+- Handles update found events
+- Message handling: `SKIP_WAITING`, `CLEAR_CACHE`
+
+**Service Worker Registration Utility (sw-register.ts):**
+- `registerServiceWorker()` - Registers `/sw.js`, handles updates
+- `unregisterServiceWorker()` - Unregisters all service workers
+- `isServiceWorkerActive()` - Checks if a service worker is controlling the page
+- `sendMessageToServiceWorker()` - Sends messages to active service worker
+- `activateWaitingServiceWorker()` - Triggers waiting service worker to become active
+- `clearServiceWorkerCache()` - Clears all caches
+
+### Features
+- Offline support: App shell loads even when offline
+- Version-based cache invalidation: Old caches cleaned automatically
+- Network-first for API: Always fetch fresh data from server
+- Cache-first for assets: Fast loading of static resources
+- Update detection: Notifies when new version is available
+- Cache management: API to clear caches and force updates
+
+### Validation Output
+- `npm run check`: PASSED (no errors, no warnings)
+- Biome lint: Checked 113 files (web-ui), 7 files (example)
+- TypeScript: clean (no errors)
+
+### Usage
+
+**Basic Registration:**
+```typescript
+import { registerServiceWorker } from "@mariozechner/pi-web-ui";
+
+// Register service worker on app initialization
+await registerServiceWorker();
+```
+
+**Advanced Usage:**
+```typescript
+import {
+  registerServiceWorker,
+  isServiceWorkerActive,
+  activateWaitingServiceWorker,
+  clearServiceWorkerCache
+} from "@mariozechner/pi-web-ui";
+
+// Register
+const registration = await registerServiceWorker();
+
+// Check if service worker is active
+if (isServiceWorkerActive()) {
+  console.log("Service worker is controlling the page");
+}
+
+// Update waiting service worker (user-triggered)
+await activateWaitingServiceWorker();
+
+// Clear all caches (user-triggered)
+await clearServiceWorkerCache();
+```
+
+**Vite Integration (vite.config.ts):**
+The service worker needs to be copied to the dist directory during build. Add this to your Vite config:
+```typescript
+import { copyFileSync, mkdirSync, existsSync } from 'fs';
+import { join } from 'path';
+
+export default defineConfig({
+  build: {
+    // ... other config
+  },
+  plugins: [
+    {
+      name: 'copy-service-worker',
+      writeBundle() {
+        const publicDir = join(__dirname, 'public');
+        const outDir = join(__dirname, 'dist');
+        
+        if (existsSync(join(publicDir, 'sw.js'))) {
+          mkdirSync(outDir, { recursive: true });
+          copyFileSync(join(publicDir, 'sw.js'), join(outDir, 'sw.js'));
+        }
+      }
+    }
+  ]
+});
+```
+
+### Notes
+- Service worker must be served from the same origin (no cross-origin)
+- Service worker requires HTTPS (except localhost)
+- Cache name includes version number for automatic invalidation
+- API calls use network-first to always get fresh data
+- Static assets use cache-first for faster loading and offline support
+- Service worker message API enables runtime control
+- Auto-update detection allows notifying users of new versions
+
+
+## Task 72: Add offline queue for pending messages - COMPLETED
+
+Created offline message queue module:
+- File: packages/web-ui/src/offline/offline-queue.ts
+- Features:
+  * IndexedDB persistence for pending messages
+  * Queue structure: { id, content, timestamp, status, retryCount }
+  * Status: 'pending' | 'sending' | 'failed'
+  * Methods: add, getAll, getByStatus, updateStatus, remove, clear
+  * Online/offline detection via navigator.onLine and events
+  * Subscription support for queue changes
+  * Singleton export: offlineQueue
+
+- Added exports to packages/web-ui/src/index.ts:
+  * type: QueuedMessage
+  * class: OfflineQueue
+  * instance: offlineQueue
+
+- Verification: npm run check passed
+
+---
+
+## Task 73: Add offline indicator - COMPLETED
+
+### Files Created
+- `packages/web-ui/src/components/OfflineIndicator.ts` - Offline indicator component showing offline status and pending message count
+
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added export for OfflineIndicator component
+- `packages/web-ui/src/utils/i18n.ts` - Added i18n translations for offline indicator
+
+### Implementation Details
+
+**OfflineIndicator Component:**
+- Extends LitElement with @customElement decorator
+- Shows banner when `navigator.onLine` is false (offline)
+- Displays pending message count from offline queue
+- Auto-hides when back online (isOnline state becomes true)
+- Subtle animation on appear using Tailwind animate-in classes
+- Subscribes to offline queue for pending message updates
+
+**State Management:**
+- `isOnline: boolean` - Tracks online/offline state (initialized from navigator.onLine)
+- `pendingMessages: QueuedMessage[]` - Array of queued messages from offline queue
+- `unsubscribe?: () => void` - Cleanup function for queue subscription
+
+**Lifecycle Methods:**
+- `connectedCallback()` - Sets up online/offline event listeners and queue subscription
+- `disconnectedCallback()` - Removes event listeners and unsubscribes from queue
+
+**Event Handlers:**
+- `handleOnline()` - Sets `isOnline = true` when connection restored
+- `handleOffline()` - Sets `isOnline = false` when connection lost
+
+**Helper Method:**
+- `getPendingCount(): number` - Filters pending messages by status === 'pending' and returns count
+
+**Rendering Logic:**
+- Empty template (hides) when online
+- When offline:
+  - 0 pending: "You're offline"
+  - 1 pending: "You're offline. 1 message pending."
+  - 2+ pending: "You're offline. {count} messages pending."
+
+**Styling:**
+- Background: `bg-amber-50 dark:bg-amber-950/30`
+- Border: `border-amber-200 dark:border-amber-800`
+- Icon: `WifiOff` from lucide, `text-amber-600 dark:text-amber-400`
+- Text: `text-amber-900 dark:text-amber-100`
+- Animation: `animate-in fade-in slide-in-from-top duration-300`
+
+**i18n Keys Added:**
+
+**English:**
+- "You're offline" - "You're offline"
+- "You're offline. 1 message pending." - "You're offline. 1 message pending."
+- "You're offline. {count} messages pending." - "You're offline. {count} messages pending."
+
+**German:**
+- "You're offline" - "Sie sind offline"
+- "You're offline. 1 message pending." - "Sie sind offline. 1 Nachricht ausstehend."
+- "You're offline. {count} messages pending." - "Sie sind offline. {count} Nachrichten ausstehend."
+
+### Component Layout
+
+```
+┌────────────────────────────────────────────────┐
+│ 🔌 You're offline. 3 messages pending.     │
+└────────────────────────────────────────────────┘
+```
+
+### Validation Output
+- `npm run check`: PASSED (no errors, no warnings)
+- Biome lint: Checked 115 files (web-ui), 7 files (example), fixed 1 file
+- TypeScript: clean (no errors)
+- All exports added to package index
+
+### Usage
+
+**Basic usage (auto-subscribes to queue):**
+```html
+<offline-indicator></offline-indicator>
+```
+
+**With manual styling:**
+```html
+<div class="my-custom-container">
+  <offline-indicator></offline-indicator>
+</div>
+```
+
+**TypeScript import:**
+```typescript
+import { OfflineIndicator } from "@mariozechner/pi-web-ui";
+
+// Component is auto-registered as <offline-indicator>
+// Can be used directly in templates
+```
+
+### Notes
+- Component automatically subscribes to offline queue for pending count
+- No props needed - all state managed internally
+- Uses singleton `offlineQueue` instance from `../offline/offline-queue.js`
+- Banner auto-hides when `navigator.onLine` becomes true
+- Animation uses Tailwind CSS `animate-in` utilities
+- Pending count only includes messages with status 'pending' (not 'sending' or 'failed')
+- Light DOM rendering (no shadow DOM)
+- Component only visible when offline (empty template when online)
+
+---
+
+## Task 74: Add background sync on reconnect - COMPLETED
+
+### Files Created
+- `packages/web-ui/src/offline/sync-manager.ts` - Sync manager for processing offline queue when device comes back online
+
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added exports for SyncManager and SyncEvent type
+
+### Implementation Details
+
+**SyncManager Class:**
+- Processes the offline queue when the device comes back online
+- Automatically triggers on browser `online` event
+- Handles failures with retry logic (max 3 attempts)
+- Emits progress events for UI feedback
+- Prevents concurrent sync operations
+
+**SyncEvent Types:**
+- `sync_start` - Emitted when sync begins, includes total message count
+- `sync_progress` - Emitted after each message sent, includes sent/total counts
+- `sync_complete` - Emitted when all messages processed, includes sent/failed counts
+- `sync_error` - Emitted when a message fails, includes messageId and error
+
+**Constructor:**
+- Takes `queue` object with methods: `getByStatus`, `updateStatus`, `remove`
+- Takes `sendFn` function to send message content to server
+- Sets up `online` event listener for auto-sync
+
+**Key Methods:**
+
+1. **sync()** - Main sync method
+   - Returns early if already syncing or offline
+   - Fetches all pending messages from queue (sorted by timestamp)
+   - Emits `sync_start` event
+   - Iterates through messages:
+     - Skips messages exceeding retry limit (MAX_RETRY_ATTEMPTS = 3)
+     - Updates status to 'sending'
+     - Calls sendFn to deliver message
+     - On success: removes from queue, emits `sync_progress`
+     - On failure: updates status to 'failed', emits `sync_error`, schedules retry
+   - Emits `sync_complete` with final counts
+   - Sets `isSyncing = false` in finally block
+
+2. **retryMessage(msg)** - Retry a single failed message
+   - Checks if message still exists and has 'failed' status
+   - Resets status to 'pending'
+   - Triggers sync if online and not already syncing
+
+3. **subscribe(listener)** - Subscribe to sync events
+   - Adds listener to internal Set
+   - Returns unsubscribe function
+
+**Private Methods:**
+- `emit(event)` - Emits event to all listeners with error isolation
+- `retryMessage(msg)` - Retries failed messages with exponential backoff
+
+**Constants:**
+- `MAX_RETRY_ATTEMPTS = 3` - Maximum number of retries per message
+- `RETRY_DELAY_MS = 1000` - Base delay between retries (multiplied by attempt number)
+
+**Retry Logic:**
+- Failed messages are marked with 'failed' status
+- If retry count < MAX_RETRY_ATTEMPTS, message is requeued after delay
+- Delay calculation: `RETRY_DELAY_MS * (msg.retryCount + 1)` (1s, 2s, 3s for attempts 1, 2, 3)
+- Messages exceeding retry limit are permanently marked as failed
+
+**Properties:**
+- `syncing` (getter) - Returns whether a sync is currently in progress
+- `isSyncing` (private) - Internal flag for sync state
+
+**Queue Interface:**
+```typescript
+{
+  getByStatus: (status: QueuedMessage["status"]) => Promise<QueuedMessage[]>;
+  updateStatus: (id: string, status: QueuedMessage["status"]) => Promise<void>;
+  remove: (id: string) => Promise<void>;
+}
+```
+
+**Event Isolation:**
+- Each listener wrapped in try-catch
+- One listener error doesn't crash other listeners
+- Errors logged to console
+
+### Design Decisions
+- Queue interface uses duck typing (any object with required methods)
+- Allows OfflineQueue or mock implementations for testing
+- Retry delay scales with attempt number (exponential backoff light)
+- Messages processed in timestamp order (oldest first)
+- Concurrent syncs prevented to avoid duplicate processing
+- Event listener errors isolated to prevent cascading failures
+- Empty queue case handled (emits nothing, returns early)
+
+### Validation Output
+- `npm run check`: PASSED (no errors, no warnings)
+- Biome lint: Checked 116 files (web-ui), 7 files (example)
+- TypeScript: clean (no errors)
+- All exports added to package index
+
+### Usage
+
+**Basic Setup:**
+```typescript
+import { SyncManager, offlineQueue } from "@mariozechner/pi-web-ui";
+
+// Create sync manager
+const syncManager = new SyncManager(
+  offlineQueue,
+  async (content) => {
+    // Send message to server
+    await rpcClient.sendCommand({
+      type: "prompt",
+      message: typeof content === "string" ? content : JSON.stringify(content),
+    });
+  }
+);
+
+// Subscribe to sync events
+const unsubscribe = syncManager.subscribe((event) => {
+  if (event.type === "sync_start") {
+    console.log(`Syncing ${event.count} messages`);
+  } else if (event.type === "sync_progress") {
+    console.log(`Progress: ${event.sent}/${event.total}`);
+  } else if (event.type === "sync_complete") {
+    console.log(`Done: ${event.sent} sent, ${event.failed} failed`);
+  } else if (event.type === "sync_error") {
+    console.error(`Message ${event.messageId} failed:`, event.error);
+  }
+});
+
+// Check sync status
+if (syncManager.syncing) {
+  console.log("Sync in progress");
+}
+
+// Cleanup when done
+unsubscribe();
+```
+
+**Integration with OfflineIndicator:**
+```typescript
+const syncManager = new SyncManager(offlineQueue, sendFn);
+
+syncManager.subscribe((event) => {
+  const indicator = document.querySelector('offline-indicator') as OfflineIndicator;
+  
+  if (event.type === "sync_start") {
+    indicator.updateStatus(`Syncing ${event.count} messages...`);
+  } else if (event.type === "sync_progress") {
+    indicator.updateStatus(`Syncing: ${event.sent}/${event.total}`);
+  } else if (event.type === "sync_complete") {
+    if (event.failed > 0) {
+      indicator.updateStatus(`${event.sent} sent, ${event.failed} failed`);
+    } else {
+      indicator.updateStatus("All messages sent");
+    }
+  }
+});
+```
+
+### Notes
+- SyncManager automatically triggers on `online` event - no manual trigger needed
+- Can be manually triggered by calling `sync()` if needed
+- Failed messages are automatically retried up to 3 times with increasing delays
+- After 3 failures, message stays in 'failed' status (requires manual intervention)
+- All sync events are typed for type safety
+- Queue interface designed for testability (can use mock queue)
+- SyncManager doesn't modify message content - just passes through to sendFn
+- Use with RPCClient or any compatible send function
+
+---
+
+## Task 75: Add storage quota management UI - COMPLETED
+
+### Files Created
+- `packages/web-ui/src/components/StorageQuota.ts` - Storage quota component displaying usage and quota information
+
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added export for StorageQuota component
+- `packages/web-ui/src/utils/i18n.ts` - Added i18n translations for storage quota strings
+
+### Implementation Details
+
+**StorageQuota Component:**
+- Extends LitElement with @customElement decorator
+- Uses `navigator.storage.estimate()` to get storage usage and quota
+- Displays current usage, quota, and percentage
+- Visual progress bar with color-coded warnings (blue → amber → red)
+- Breakdown by category (sessions, cache, settings) - estimated percentages
+- Warning banner when storage nearly full (≥80% warning, ≥90% critical)
+- Loading, error, and empty states handled gracefully
+
+**Props:**
+- None - all data fetched from Storage API on mount
+
+**State Management:**
+- `estimate: StorageEstimate | null` - Storage estimate data {usage, quota}
+- `breakdown: StorageBreakdown | null` - Category breakdown {sessions, cache, settings, total}
+- `loading: boolean` - Loading state during fetch
+- `error: string | null` - Error message if fetch fails
+
+**StorageEstimate Interface:**
+```typescript
+interface StorageEstimate {
+  usage: number;
+  quota: number | null;
+}
+```
+
+**StorageBreakdown Interface:**
+```typescript
+interface StorageBreakdown {
+  sessions: number;  // ~70%
+  cache: number;     // ~25%
+  settings: number;   // ~5%
+  total: number;
+}
+```
+
+**Key Methods:**
+- `async loadStorageInfo()` - Fetches storage estimate via `navigator.storage.estimate()`
+- `async estimateBreakdown()` - Estimates category breakdown (70/25/5 split)
+- `getUsagePercentage()` - Calculates usage as 0-1 fraction of quota
+- `getProgressColorClass()` - Returns bar color class (blue/amber/red) based on usage
+- `getWarningClass()` - Returns warning banner classes based on threshold
+- `formatBytes(bytes)` - Converts bytes to human-readable format (B/KB/MB/GB)
+
+**Constants:**
+- `WARNING_THRESHOLD = 0.8` - 80% triggers amber warning
+- `CRITICAL_THRESHOLD = 0.9` - 90% triggers red warning
+
+**Rendering Methods:**
+- `renderProgressBar()` - Visual progress bar with percentage fill
+- `renderWarning()` - Warning banner with AlertTriangle icon (80%+)
+- `renderBreakdown()` - Category breakdown list (sessions/cache/settings)
+
+**Loading State:**
+- Skeleton animation with placeholder bars
+- Shows while waiting for `navigator.storage.estimate()` to resolve
+
+**Error State:**
+- Displays "Unable to retrieve storage information" message
+- Database icon with error text
+- Occurs when Storage API fails
+
+**Empty State:**
+- Displays "Storage quota information not available"
+- Occurs when estimate is null (quota not provided by browser)
+
+**Progress Bar Color Logic:**
+- < 80%: Blue (bg-blue-500)
+- 80-89%: Amber (bg-amber-500) with warning banner
+- ≥90%: Red (bg-red-500) with critical warning banner
+
+**Warning Banner:**
+- Shows AlertTriangle icon
+- "Storage nearly full" title
+- "Consider clearing old data or managing your storage usage" subtitle
+- Color-matched to threshold (amber/red background)
+
+**Byte Formatting:**
+- 0 bytes → "0 B"
+- < 1 KB → bytes
+- 1 KB to < 1 MB → KB with 1 decimal
+- 1 MB to < 1 GB → MB with 1 decimal
+- ≥ 1 GB → GB with 1 decimal
+
+**Breakdown Estimation:**
+- Since Storage API doesn't provide per-category breakdown
+- Uses estimated percentages: 70% sessions, 25% cache, 5% settings
+- Real implementation would query IndexedDB stores for accurate values
+
+**Styling:**
+- Light DOM rendering (no shadow DOM)
+- Uses Tailwind utility classes
+- Consistent with other components in the package
+- Progress bar has transition-all for smooth updates
+
+**i18n Keys Added:**
+
+**English:**
+- "Storage Usage" - "Storage Usage"
+- "{used} of {total} used" - "{used} of {total} used"
+- Cache - "Cache"
+- "Storage quota information not available" - "Storage quota information not available"
+- "Unable to retrieve storage information" - "Unable to retrieve storage information"
+- "Storage nearly full" - "Storage nearly full"
+- "Consider clearing old data or managing your storage usage" - "Consider clearing old data or managing your storage usage"
+
+**German:**
+- "Storage Usage" - "Speichernutzung"
+- "{used} of {total} used" - "{used} von {total} verwendet"
+- Cache - "Cache"
+- "Storage quota information not available" - "Speicherquoten-Informationen nicht verfügbar"
+- "Unable to retrieve storage information" - "Speicherinformationen können nicht abgerufen werden"
+- "Storage nearly full" - "Speicher fast voll"
+- "Consider clearing old data or managing your storage usage" - "Erwägen Sie das Löschen alter Daten oder die Verwaltung Ihrer Speichernutzung"
+
+### Component Layout
+
+```
+┌────────────────────────────────────────────────┐
+│ 🗄️ Storage Usage                            │
+│                                                │
+│ ████████████████░░░░░░░░░░░░░░░░  45%         │
+│ 450 MB of 1 GB used                            │
+│                                                │
+│ Sessions: 320 MB                               │
+│ Cache: 100 MB                                  │
+│ Settings: 30 MB                               │
+│                                                │
+│ ⚠️ Storage nearly full                         │
+│ Consider clearing old data...                   │
+└────────────────────────────────────────────────┘
+```
+
+### Validation Output
+- `npm run check`: PASSED (no errors, no warnings)
+- Biome lint: Checked 117 files (web-ui), 7 files (example), fixed 3 files
+- TypeScript: clean (no errors)
+- All exports added to package index
+
+### Usage
+
+**Basic usage:**
+```html
+<pi-storage-quota></pi-storage-quota>
+```
+
+**With manual container:**
+```html
+<div class="storage-section">
+  <pi-storage-quota></pi-storage-quota>
+</div>
+```
+
+**TypeScript import:**
+```typescript
+import { StorageQuota } from "@mariozechner/pi-web-ui";
+
+// Component is auto-registered as <pi-storage-quota>
+// Can be used directly in templates
+```
+
+### Notes
+- Component uses `navigator.storage.estimate()` which requires HTTPS or localhost
+- Some browsers may not return quota information (null value)
+- Breakdown values are estimates (actual implementation would query IndexedDB)
+- Percentage display omitted when quota is null
+- Loading state uses skeleton animation for better UX
+- Warning thresholds (80%/90%) can be adjusted via constants
+- Component auto-refreshes data on mount (no auto-update interval)
+- Light DOM rendering allows easy styling overrides from parent
+- Uses existing i18n keys (Sessions, Settings) where possible
+- Cache is a new i18n key (was not previously defined)
+
+## Task 76: Add import/export all data - COMPLETED
+
+### Created Files
+- `packages/web-ui/src/utils/data-export.ts` - Data export/import utilities
+
+### Summary
+Created comprehensive utilities to export and import all user data for backup/restore functionality.
+
+### Features Implemented
+1. **ExportData interface** with version, timestamp, sessions, settings, connections, and provider keys
+2. **exportAllData()** - Gathers all data from all stores into structured export format
+3. **downloadExport()** - Triggers browser download of JSON export file
+4. **importData()** - Imports data with merge or replace mode
+5. **parseExportData()** - Validates and parses export JSON
+6. **exportAndDownload()** - Convenience function combining export and download
+7. **importFromFile()** - Convenience function for file-based imports
+
+### Store Enhancements
+Added missing methods to support data export/import:
+- `SessionsStore.getAll()` - Retrieve all session data
+- `SessionsStore.clear()` - Clear all sessions (data + metadata)
+- `ConnectionsStore.clear()` - Clear all connection profiles
+- `ProviderKeysStore.clear()` - Clear all provider keys
+
+### Export Format
+```typescript
+interface ExportData {
+  version: number; // Format version for migration
+  exportedAt: string; // ISO timestamp
+  sessions: SessionData[]; // All chat sessions
+  settings: Record<string, unknown>; // Application settings
+  connections: ConnectionProfile[]; // Saved connections
+  providerKeys: ProviderKeyData[]; // API keys
+}
+```
+
+### Validation
+- `npm run check` passes without errors
+
+### Notes
+- Export includes version field for future migration compatibility
+- Merge mode preserves existing data, replace mode clears before import
+- All data is gathered atomically for consistent exports
+- Import validates structure and required fields before processing
+
+
+---
+
+## Task 77: Add storage cleanup tools - Completed
+
+### Files Created
+- `packages/web-ui/src/utils/storage-cleanup.ts` - Storage cleanup utilities module
+
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added exports for storage cleanup functions and types
+
+### Implementation Details
+
+**CleanupOptions Interface:**
+- `olderThanDays?: number` - Delete sessions older than N days
+- `keepMinSessions?: number` - Keep at least this many recent sessions
+- `maxSessionSizeBytes?: number` - Delete sessions exceeding size threshold
+- `clearCache?: boolean` - Clear session cache for remote sessions
+- `clearOfflineQueue?: boolean` - Clear offline message queue
+
+**CleanupResult Interface:**
+- `sessionsDeleted: number` - Number of sessions deleted
+- `bytesFreed: number` - Total bytes freed
+- `cacheCleared: boolean` - Whether cache was cleared
+- `queueCleared: boolean` - Whether offline queue was cleared
+- `cacheEntriesDeleted?: number` - Count of deleted cache entries
+- `queueMessagesDeleted?: number` - Count of deleted queue messages
+
+**CleanupPreview Interface:**
+- `sessionsToDelete: number` - Number of sessions that would be deleted
+- `estimatedBytesToFree: number` - Estimated bytes that would be freed
+- `cacheEntriesToClear?: number` - Cache entries that would be cleared
+- `queueMessagesToClear?: number` - Queue messages that would be cleared
+
+**Exported Functions:**
+
+1. **getCleanupPreview(options)** - Preview cleanup without deleting
+   - Returns estimated deletion counts and bytes
+   - Calculates session sizes via JSON serialization
+   - Includes cache and queue counts if options include them
+
+2. **cleanupStorage(options)** - Perform cleanup based on options
+   - Deletes sessions matching age/size/minimum criteria
+   - Clears session cache if requested
+   - Clears offline queue if requested
+   - Returns detailed result with counts and bytes
+
+3. **factoryReset()** - Clear all stored data
+   - Clears all IndexedDB stores (sessions, settings, provider-keys, custom-providers, connections, session-cache)
+   - Clears offline queue database
+   - Clears service worker cache if available
+
+4. **getStorageSize()** - Get size breakdown by store
+   - Returns sizes for: sessions, metadata, cache, settings, providerKeys, customProviders, connections
+   - Returns total size
+
+5. **getStorageStats()** - Get comprehensive storage statistics
+   - Returns quota info (usage, quota, percent)
+   - Returns size breakdown
+   - Returns session, cache entry, and queue message counts
+
+**Helper Functions:**
+- `estimateSessionSize(session)` - Approximate session size via JSON serialization
+- `getSessionsToDelete(options)` - Get sessions matching cleanup criteria
+  - Sorts by lastModified (most recent first)
+  - Applies keepMinSessions filter
+  - Applies olderThanDays filter
+  - Applies maxSessionSizeBytes filter
+
+**Design Decisions:**
+- Uses `storage.backend` (public) instead of `storage.sessions.backend` (protected)
+- Session size estimation uses Blob.size from JSON serialization
+- Graceful error handling - operations continue on individual failures
+- Preview function allows user confirmation before deletion
+- Factory reset is atomic - throws if any store fails to clear
+
+### Validation Output
+- `npm run check`: PASSED (no errors, no warnings)
+- Biome lint: Checked 449 files (root), 119 files (web-ui), 7 files (example)
+- TypeScript: clean (no errors)
+- All exports added to package index
+
+### Usage
+
+**Preview cleanup:**
+```typescript
+import { getCleanupPreview } from "@mariozechner/pi-web-ui";
+
+const preview = await getCleanupPreview({
+  olderThanDays: 30,
+  keepMinSessions: 5,
+  clearCache: true,
+});
+
+console.log(`Will delete ${preview.sessionsToDelete} sessions`);
+console.log(`Estimated space freed: ${preview.estimatedBytesToFree} bytes`);
+console.log(`Cache entries to clear: ${preview.cacheEntriesToClear}`);
+```
+
+**Perform cleanup:**
+```typescript
+import { cleanupStorage } from "@mariozechner/pi-web-ui";
+
+const result = await cleanupStorage({
+  olderThanDays: 30,
+  keepMinSessions: 5,
+  clearCache: true,
+  clearOfflineQueue: true,
+});
+
+console.log(`Deleted ${result.sessionsDeleted} sessions`);
+console.log(`Freed ${result.bytesFreed} bytes`);
+console.log(`Cache cleared: ${result.cacheCleared}`);
+console.log(`Queue cleared: ${result.queueCleared}`);
+```
+
+**Factory reset:**
+```typescript
+import { factoryReset } from "@mariozechner/pi-web-ui";
+
+await factoryReset(); // Clears all data
+```
+
+**Get storage stats:**
+```typescript
+import { getStorageStats } from "@mariozechner/pi-web-ui";
+
+const stats = await getStorageStats();
+console.log(`Storage usage: ${stats.quota.percent.toFixed(1)}%`);
+console.log(`Total sessions: ${stats.sessionCount}`);
+console.log(`Storage by category:`, stats.sizes);
+```
+
+### Notes
+- Session size estimation is approximate (JSON serialization)
+- Factory reset is destructive and cannot be undone
+- Cache and queue operations are independent of session deletion
+- All operations use AppStorage.backend (public property) for store access
+- Offline queue uses its own IndexedDB database ("pi-web-ui-offline-queue")
+
+---
+
+## Task 78: Add data migration on version upgrades - Completed
+
+### Files Created
+- `packages/web-ui/src/storage/migrations.ts` - Migration system for schema upgrades
+
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added exports for migration types and functions
+
+### Implementation Details
+
+**Migration Interface:**
+- `version: number` - Schema version this migration upgrades to
+- `description: string` - Human-readable description of migration purpose
+- `migrate: () => Promise<void>` - Migration implementation (must be idempotent)
+
+**MIGRATIONS Array:**
+- Empty for now (no migrations yet)
+- Future migrations added in version order (ascending)
+- Pattern documented with example comment
+
+**Version Tracking:**
+- `VERSION_KEY = "schema.version"` - Key stored in settings store
+- `getCurrentVersion()` - Returns stored version or 1 (default)
+- `setVersion(version)` - Stores new version in settings
+- Error handling with fallback to version 1 if storage unavailable
+
+**runMigrations() Function:**
+- Gets current version from settings
+- Filters MIGRATIONS for pending (version > current)
+- Executes migrations sequentially
+- Only updates version after successful migration
+- On failure: throws error, version NOT updated (allows retry)
+- Returns `{ migrationsRun: number, currentVersion: number }`
+- Console logs for debugging migration progress
+
+**Helper Functions:**
+- `hasPendingMigrations()` - Check if migrations needed without running
+- `getLatestVersion()` - Get highest migration version
+
+**Error Handling:**
+- Graceful degradation when storage unavailable (assumes version 1)
+- Migration failures halt execution with descriptive error
+- Version never updated on failure (safe retry on next startup)
+
+### Design Decisions
+- Version 1 is baseline (no stored version = initial state)
+- Migrations must be idempotent (safe to run multiple times)
+- SettingsStore used for version tracking (isolated from data stores)
+- Sequential execution ensures order integrity
+- Failed migrations prevent version update (allowing manual intervention)
+
+### Validation Output
+- `npm run check`: PASSED (no errors, no warnings)
+- Biome lint: Checked 120 files (web-ui), fixed 2 files (auto-format)
+- TypeScript: clean (no errors)
+- All exports added to package index
+
+### Usage
+```typescript
+import {
+  runMigrations,
+  hasPendingMigrations,
+  getCurrentVersion,
+  getLatestVersion,
+  MIGRATIONS,
+} from "@mariozechner/pi-web-ui";
+
+// Check for pending migrations
+const pending = await hasPendingMigrations();
+if (pending) {
+  console.log("Pending migrations available");
+}
+
+// Run migrations on app startup
+const result = await runMigrations();
+console.log(`Ran ${result.migrationsRun} migrations, now at version ${result.currentVersion}`);
+
+// Check current version
+const current = await getCurrentVersion();
+const latest = getLatestVersion();
+console.log(`Schema version: ${current}/${latest}`);
+```
+
+### Adding Future Migrations
+
+```typescript
+// Add to MIGRATIONS array in migrations.ts
+{
+  version: 2,
+  description: "Add usage tracking to sessions",
+  migrate: async () => {
+    // Migration logic here
+    // Must be idempotent (check if already done)
+  },
+},
+```
+
+### Notes
+- Empty migrations array is correct for initial implementation
+- System is ready for future schema upgrades
+- Migrations run automatically on app startup when integrated
+- Use transaction for atomic multi-store operations when needed

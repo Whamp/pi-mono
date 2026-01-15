@@ -131,6 +131,7 @@ export class SessionListDialog extends DialogBase {
 													class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-destructive transition-opacity"
 													@click=${(e: Event) => this.handleDelete(session.id, e)}
 													title=${i18n("Delete")}
+													aria-label=${i18n("Delete session")}
 												>
 													<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 														<path d="M3 6h18"></path>

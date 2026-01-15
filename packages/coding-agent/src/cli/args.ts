@@ -34,6 +34,8 @@ export interface Args {
 	noSkills?: boolean;
 	skills?: string[];
 	listModels?: string | true;
+	serve?: boolean;
+	servePort?: number;
 	messages: string[];
 	fileArgs: string[];
 	/** Unknown flags (potentially extension flags) - map of flag name to value */
@@ -134,6 +136,10 @@ export function parseArgs(args: string[], extensionFlags?: Map<string, { type: "
 			} else {
 				result.listModels = true;
 			}
+		} else if (arg === "--serve") {
+			result.serve = true;
+		} else if (arg === "--port" && i + 1 < args.length) {
+			result.servePort = parseInt(args[++i], 10);
 		} else if (arg.startsWith("@")) {
 			result.fileArgs.push(arg.slice(1)); // Remove @ prefix
 		} else if (arg.startsWith("--") && extensionFlags) {
@@ -170,6 +176,8 @@ ${chalk.bold("Options:")}
   --append-system-prompt <text>  Append text or file contents to the system prompt
   --mode <mode>                  Output mode: text (default), json, or rpc
   --print, -p                    Non-interactive mode: process prompt and exit
+  --serve                        Start WebSocket RPC server for web UI
+  --port <number>                Port for --serve mode (default: 8765)
   --continue, -c                 Continue previous session
   --resume, -r                   Select a session to resume
   --session <path>               Use specific session file
@@ -216,6 +224,9 @@ ${chalk.bold("Examples:")}
 
   # Limit model cycling to specific models
   ${APP_NAME} --models claude-sonnet,claude-haiku,gpt-4o
+
+  # Start WebSocket server for web UI
+  ${APP_NAME} --serve --port 8765
 
   # Limit to a specific provider with glob pattern
   ${APP_NAME} --models "github-copilot/*"

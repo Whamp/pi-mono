@@ -33,6 +33,8 @@ Unified LLM API with automatic model discovery, provider configuration, token an
 - [Cross-Provider Handoffs](#cross-provider-handoffs)
 - [Context Serialization](#context-serialization)
 - [Browser Usage](#browser-usage)
+  - [Browser Compatibility](#browser-compatibility)
+  - [Bundler Configuration (Vite)](#bundler-configuration-vite)
   - [Environment Variables](#environment-variables-nodejs-only)
   - [Checking Environment Variables](#checking-environment-variables)
 - [OAuth Providers](#oauth-providers)
@@ -848,6 +850,140 @@ const response = await complete(model, {
 ```
 
 > **Security Warning**: Exposing API keys in frontend code is dangerous. Anyone can extract and abuse your keys. Only use this approach for internal tools or demos. For production applications, use a backend proxy that keeps your API keys secure.
+
+### Browser Compatibility
+
+Most providers work in browsers with the standard streaming APIs. However, the library includes some Node.js-specific code for credential detection and OAuth flows that requires bundler configuration.
+
+**Providers that work in browsers:**
+- OpenAI, Anthropic, Google, Mistral, Groq, Cerebras, xAI, OpenRouter, Vercel AI Gateway, MiniMax, Amazon Bedrock
+
+**Providers that do NOT work in browsers:**
+- **Google Gemini CLI** - Requires `node:crypto` for OAuth hash generation
+- **OpenAI Codex** - Requires `node:crypto` and `node:os` for OAuth flows
+
+### Bundler Configuration (Vite)
+
+The library uses Node.js modules (`node:crypto`, `node:fs`, `node:os`, `node:path`) for credential detection. To use the library in browsers, configure your bundler to stub these modules. Here's a Vite configuration example:
+
+```typescript
+// vite.config.ts
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
+import { defineConfig } from "vite";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+export default defineConfig({
+  define: {
+    "process.env": "{}",
+    process: JSON.stringify({ env: {} }),
+  },
+  resolve: {
+    alias: {
+      "node:crypto": resolve(__dirname, "src/stubs/crypto.ts"),
+      "node:os": resolve(__dirname, "src/stubs/os.ts"),
+      "node:fs": resolve(__dirname, "src/stubs/fs.ts"),
+      "node:path": resolve(__dirname, "src/stubs/path.ts"),
+    },
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      define: {
+        global: "globalThis",
+      },
+    },
+  },
+});
+```
+
+Create these stub files in `src/stubs/`:
+
+**crypto.ts** - Stubs for hash and random bytes:
+```typescript
+export function createHash(_algorithm: string) {
+  return {
+    update(_data: string) { return this; },
+    digest(_encoding: string) {
+      return "0000000000000000000000000000000000000000000000000000000000000000";
+    },
+  };
+}
+
+export function randomBytes(size: number): Uint8Array {
+  const bytes = new Uint8Array(size);
+  crypto.getRandomValues(bytes);
+  return bytes;
+}
+```
+
+**fs.ts** - File system stubs (returns safe defaults):
+```typescript
+export function existsSync(_path: string): boolean {
+  return false;
+}
+
+export function readFileSync(_path: string, _encoding?: string): string {
+  throw new Error("readFileSync is not available in browser");
+}
+
+export function writeFileSync(_path: string, _data: string): void {
+  throw new Error("writeFileSync is not available in browser");
+}
+
+export function mkdirSync(_path: string, _options?: unknown): void {
+  throw new Error("mkdirSync is not available in browser");
+}
+
+export default { existsSync, readFileSync, writeFileSync, mkdirSync };
+```
+
+**os.ts** - OS info stubs:
+```typescript
+export function hostname(): string { return "browser"; }
+export function platform(): string { return "browser"; }
+export function arch(): string { return "unknown"; }
+export function userInfo() { return { username: "browser-user" }; }
+export function homedir(): string { return "/home/browser"; }
+
+export default { hostname, platform, arch, userInfo, homedir };
+```
+
+**path.ts** - Path utilities:
+```typescript
+export function join(...paths: string[]): string {
+  return paths.join("/").replace(/\/+/g, "/");
+}
+
+export function resolve(...paths: string[]): string {
+  return join(...paths);
+}
+
+export function dirname(p: string): string {
+  const parts = p.split("/");
+  parts.pop();
+  return parts.join("/") || "/";
+}
+
+export function basename(p: string, ext?: string): string {
+  const base = p.split("/").pop() || "";
+  if (ext && base.endsWith(ext)) return base.slice(0, -ext.length);
+  return base;
+}
+
+export function extname(p: string): string {
+  const base = basename(p);
+  const dot = base.lastIndexOf(".");
+  return dot > 0 ? base.slice(dot) : "";
+}
+
+export const sep = "/";
+export const delimiter = ":";
+
+export default { join, resolve, dirname, basename, extname, sep, delimiter };
+```
+
+For a complete working example, see the `packages/web-ui/example/` directory in the source repository.
 
 ### Environment Variables (Node.js only)
 

@@ -361,6 +361,7 @@ export class MessageEditor extends LitElement {
 											size: "icon",
 											className: "h-8 w-8",
 											onClick: this.handleAttachmentClick,
+											title: i18n("Attach files"),
 											children: icon(Paperclip, "sm"),
 										})}
 									`
@@ -424,6 +425,7 @@ export class MessageEditor extends LitElement {
 										variant: "ghost",
 										size: "icon",
 										onClick: this.onAbort,
+										title: i18n("Stop generating"),
 										children: icon(Square, "sm"),
 										className: "h-8 w-8",
 									})}
@@ -434,6 +436,7 @@ export class MessageEditor extends LitElement {
 										size: "icon",
 										onClick: this.handleSend,
 										disabled: (!this.value.trim() && this.attachments.length === 0) || this.processingFiles,
+										title: i18n("Send message"),
 										children: html`<div style="transform: rotate(-45deg)">${icon(Send, "sm")}</div>`,
 										className: "h-8 w-8",
 									})}

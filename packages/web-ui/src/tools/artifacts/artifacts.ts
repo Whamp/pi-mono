@@ -7,7 +7,7 @@ import { type Static, Type } from "@sinclair/typebox";
 import { html, LitElement, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { createRef, type Ref, ref } from "lit/directives/ref.js";
-import { X } from "lucide";
+import { ChevronDown, History, Maximize2, X } from "lucide";
 import type { ArtifactMessage } from "../../components/Messages.js";
 import { ArtifactsRuntimeProvider } from "../../components/sandbox/ArtifactsRuntimeProvider.js";
 import { AttachmentsRuntimeProvider } from "../../components/sandbox/AttachmentsRuntimeProvider.js";
@@ -18,17 +18,28 @@ import {
 	ATTACHMENTS_RUNTIME_DESCRIPTION,
 } from "../../prompts/prompts.js";
 import type { Attachment } from "../../utils/attachment-utils.js";
+import { createSwipeHandler, type SwipeHandler } from "../../utils/gesture-utils.js";
 import { i18n } from "../../utils/i18n.js";
+import { type ContextualShortcutHandler, createContextualShortcutHandler } from "../../utils/keyboard-shortcuts.js";
 import type { ArtifactElement } from "./ArtifactElement.js";
 import { DocxArtifact } from "./DocxArtifact.js";
 import { ExcelArtifact } from "./ExcelArtifact.js";
+import "./FullscreenArtifact.js";
 import { GenericArtifact } from "./GenericArtifact.js";
 import { HtmlArtifact } from "./HtmlArtifact.js";
 import { ImageArtifact } from "./ImageArtifact.js";
+import { JsonViewer } from "./JsonViewer.js";
 import { MarkdownArtifact } from "./MarkdownArtifact.js";
 import { PdfArtifact } from "./PdfArtifact.js";
 import { SvgArtifact } from "./SvgArtifact.js";
 import { TextArtifact } from "./TextArtifact.js";
+
+// Version history entry
+export interface ArtifactVersion {
+	version: number;
+	content: string;
+	timestamp: string;
+}
 
 // Simple artifact model
 export interface Artifact {
@@ -36,6 +47,7 @@ export interface Artifact {
 	content: string;
 	createdAt: Date;
 	updatedAt: Date;
+	versions: ArtifactVersion[]; // All versions including current
 }
 
 // JSON-schema friendly parameters object (LLM-facing)
@@ -54,10 +66,22 @@ export type ArtifactsParams = Static<typeof artifactsParamsSchema>;
 export class ArtifactsPanel extends LitElement {
 	@state() private _artifacts = new Map<string, Artifact>();
 	@state() private _activeFilename: string | null = null;
+	@state() private _viewingVersion: number | null = null; // null = current version
+	@state() private _versionDropdownOpen = false;
+	@state() private _isFullscreen = false;
+	@state() private windowWidth = 0;
 
 	// Programmatically managed artifact elements
 	private artifactElements = new Map<string, ArtifactElement>();
 	private contentRef: Ref<HTMLDivElement> = createRef();
+	private shortcutHandler: ContextualShortcutHandler = createContextualShortcutHandler();
+
+	// Swipe gesture handlers for mobile
+	private swipeLeftHandler?: SwipeHandler;
+	private swipeRightHandler?: SwipeHandler;
+	private fullscreenSwipeDownHandler?: SwipeHandler;
+	private contentElement?: HTMLElement;
+	private boundHandleResize = this.handleResize.bind(this);
 
 	// Agent reference (needed to get attachments for HTML artifacts)
 	@property({ attribute: false }) agent?: Agent;
@@ -108,6 +132,14 @@ export class ArtifactsPanel extends LitElement {
 		super.connectedCallback();
 		this.style.display = "block";
 		this.style.height = "100%";
+		this.windowWidth = window.innerWidth;
+		window.addEventListener("resize", this.boundHandleResize);
+		// Add click-outside listener for version dropdown
+		document.addEventListener("click", this.handleClickOutside);
+		// Setup keyboard shortcuts
+		this.setupShortcuts();
+		// Setup swipe gestures for mobile
+		this.setupSwipeHandlers();
 		// Reattach existing artifact elements when panel is re-inserted into the DOM
 		requestAnimationFrame(() => {
 			const container = this.contentRef.value;
@@ -123,15 +155,160 @@ export class ArtifactsPanel extends LitElement {
 		});
 	}
 
+	private setupShortcuts() {
+		// Cmd+Shift+[ : Go to previous artifact tab
+		this.shortcutHandler.register({
+			key: "[",
+			meta: true,
+			shift: true,
+			handler: () => this.navigateTab(-1),
+			description: i18n("Previous tab"),
+		});
+
+		// Cmd+Shift+] : Go to next artifact tab
+		this.shortcutHandler.register({
+			key: "]",
+			meta: true,
+			shift: true,
+			handler: () => this.navigateTab(1),
+			description: i18n("Next tab"),
+		});
+
+		// Cmd+W : Close current artifact
+		this.shortcutHandler.register({
+			key: "w",
+			meta: true,
+			handler: () => this.closeCurrentArtifact(),
+			description: i18n("Close tab"),
+		});
+
+		// Attach to this element
+		this.shortcutHandler.attach(this);
+	}
+
+	private navigateTab(delta: number) {
+		const filenames = Array.from(this._artifacts.keys());
+		if (filenames.length === 0) return;
+
+		const currentIndex = this._activeFilename ? filenames.indexOf(this._activeFilename) : 0;
+		let newIndex = currentIndex + delta;
+
+		// Wrap around
+		if (newIndex < 0) {
+			newIndex = filenames.length - 1;
+		} else if (newIndex >= filenames.length) {
+			newIndex = 0;
+		}
+
+		this.showArtifact(filenames[newIndex]);
+	}
+
+	private closeCurrentArtifact() {
+		if (this._activeFilename) {
+			this.deleteArtifact({ command: "delete", filename: this._activeFilename });
+		}
+	}
+
+	private handleResize() {
+		this.windowWidth = window.innerWidth;
+	}
+
+	private isMobile(): boolean {
+		return this.windowWidth < 768;
+	}
+
+	private setupSwipeHandlers() {
+		// Swipe left → next artifact (mobile only)
+		this.swipeLeftHandler = createSwipeHandler({
+			direction: "left",
+			onSwipe: () => {
+				if (this.isMobile()) {
+					this.navigateTab(1);
+				}
+			},
+		});
+
+		// Swipe right → previous artifact (mobile only)
+		this.swipeRightHandler = createSwipeHandler({
+			direction: "right",
+			onSwipe: () => {
+				if (this.isMobile()) {
+					this.navigateTab(-1);
+				}
+			},
+		});
+
+		// Swipe down on fullscreen → close (mobile only)
+		this.fullscreenSwipeDownHandler = createSwipeHandler({
+			direction: "down",
+			onSwipe: () => {
+				if (this.isMobile() && this._isFullscreen) {
+					this._isFullscreen = false;
+				}
+			},
+		});
+
+		// Attach content swipe handlers to this element
+		this.swipeLeftHandler.attach(this);
+		this.swipeRightHandler.attach(this);
+	}
+
+	private cleanupSwipeHandlers() {
+		this.swipeLeftHandler?.detach();
+		this.swipeRightHandler?.detach();
+		this.fullscreenSwipeDownHandler?.detach();
+		this.contentElement = undefined;
+	}
+
+	override updated(changedProperties: Map<string, unknown>) {
+		super.updated(changedProperties);
+
+		// Attach fullscreen swipe handler when fullscreen opens on mobile
+		if (changedProperties.has("_isFullscreen")) {
+			if (this._isFullscreen && this.isMobile()) {
+				// Find the fullscreen artifact element
+				const fullscreenEl = this.querySelector("fullscreen-artifact") as HTMLElement | null;
+				if (fullscreenEl && fullscreenEl !== this.contentElement) {
+					this.fullscreenSwipeDownHandler?.detach();
+					this.contentElement = fullscreenEl;
+					this.fullscreenSwipeDownHandler?.attach(fullscreenEl);
+				}
+			} else if (!this._isFullscreen) {
+				// Fullscreen closed - detach fullscreen swipe handler
+				this.fullscreenSwipeDownHandler?.detach();
+				this.contentElement = undefined;
+			}
+		}
+	}
+
 	override disconnectedCallback() {
 		super.disconnectedCallback();
 		// Do not tear down artifact elements; keep them to restore on next mount
+		// Remove click-outside listener
+		document.removeEventListener("click", this.handleClickOutside);
+		window.removeEventListener("resize", this.boundHandleResize);
+		// Detach keyboard shortcuts
+		this.shortcutHandler.detach();
+		// Detach swipe handlers
+		this.cleanupSwipeHandlers();
 	}
+
+	// Click outside handler for version dropdown
+	private handleClickOutside = (e: MouseEvent) => {
+		if (this._versionDropdownOpen) {
+			const target = e.target as HTMLElement;
+			// Check if click is outside the version dropdown area
+			if (!target.closest(".version-dropdown-container")) {
+				this._versionDropdownOpen = false;
+				this.requestUpdate();
+			}
+		}
+	};
 
 	// Helper to determine file type from extension
 	private getFileType(
 		filename: string,
-	): "html" | "svg" | "markdown" | "image" | "pdf" | "excel" | "docx" | "text" | "generic" {
+	): "html" | "svg" | "markdown" | "image" | "pdf" | "excel" | "docx" | "json" | "text" | "generic" {
 		const ext = filename.split(".").pop()?.toLowerCase();
 		if (ext === "html") return "html";
 		if (ext === "svg") return "svg";
@@ -139,6 +316,7 @@ export class ArtifactsPanel extends LitElement {
 		if (ext === "pdf") return "pdf";
 		if (ext === "xlsx" || ext === "xls") return "excel";
 		if (ext === "docx") return "docx";
+		if (ext === "json") return "json";
 		if (
 			ext === "png" ||
 			ext === "jpg" ||
@@ -152,7 +330,6 @@ export class ArtifactsPanel extends LitElement {
 		// Text files
 		if (
 			ext === "txt" ||
-			ext === "json" ||
 			ext === "xml" ||
 			ext === "yaml" ||
 			ext === "yml" ||
@@ -201,6 +378,8 @@ export class ArtifactsPanel extends LitElement {
 				element = new ExcelArtifact();
 			} else if (type === "docx") {
 				element = new DocxArtifact();
+			} else if (type === "json") {
+				element = new JsonViewer();
 			} else if (type === "text") {
 				element = new TextArtifact();
 			} else {
@@ -238,6 +417,10 @@ export class ArtifactsPanel extends LitElement {
 
 	// Show/hide artifact elements
 	private showArtifact(filename: string) {
+		// Reset version viewing when switching artifacts
+		this._viewingVersion = null;
+		this._versionDropdownOpen = false;
+
 		// Ensure the active element is in the DOM
 		requestAnimationFrame(() => {
 			this.artifactElements.forEach((element, name) => {
@@ -475,11 +658,19 @@ export class ArtifactsPanel extends LitElement {
 			return `Error: File ${params.filename} already exists`;
 		}
 
+		const now = new Date();
 		const artifact: Artifact = {
 			filename: params.filename,
 			content: params.content,
-			createdAt: new Date(),
-			updatedAt: new Date(),
+			createdAt: now,
+			updatedAt: now,
+			versions: [
+				{
+					version: 1,
+					content: params.content,
+					timestamp: now.toISOString(),
+				},
+			],
 		};
 		this._artifacts.set(params.filename, artifact);
 		this._artifacts = new Map(this._artifacts);
@@ -522,8 +713,17 @@ export class ArtifactsPanel extends LitElement {
 			return `Error: String not found in file. Here is the full content:\n\n${artifact.content}`;
 		}
 
-		artifact.content = artifact.content.replace(params.old_str, params.new_str);
-		artifact.updatedAt = new Date();
+		// Store current content as a new version before updating
+		const now = new Date();
+		const newVersion: ArtifactVersion = {
+			version: artifact.versions.length + 1,
+			content: artifact.content.replace(params.old_str, params.new_str),
+			timestamp: now.toISOString(),
+		};
+		artifact.versions.push(newVersion);
+
+		artifact.content = newVersion.content;
+		artifact.updatedAt = now;
 		this._artifacts.set(params.filename, artifact);
 
 		// Update element
@@ -563,8 +763,17 @@ export class ArtifactsPanel extends LitElement {
 			return "Error: rewrite command requires content";
 		}
 
+		// Store the new content as a new version
+		const now = new Date();
+		const newVersion: ArtifactVersion = {
+			version: artifact.versions.length + 1,
+			content: params.content,
+			timestamp: now.toISOString(),
+		};
+		artifact.versions.push(newVersion);
+
 		artifact.content = params.content;
-		artifact.updatedAt = new Date();
+		artifact.updatedAt = now;
 		this._artifacts.set(params.filename, artifact);
 
 		// Update element
@@ -657,6 +866,13 @@ export class ArtifactsPanel extends LitElement {
 		// Panel is hidden when collapsed OR when there are no artifacts
 		const showPanel = artifacts.length > 0 && !this.collapsed;
 
+		// Get active artifact for version display
+		const activeArtifact = this._activeFilename ? this._artifacts.get(this._activeFilename) : undefined;
+		const hasVersions = activeArtifact && activeArtifact.versions.length > 1;
+		const currentVersion = activeArtifact?.versions.length ?? 1;
+		const viewingVersion = this._viewingVersion ?? currentVersion;
+		const isViewingOldVersion = this._viewingVersion !== null && this._viewingVersion !== currentVersion;
+
 		return html`
 			<div
 				class="${showPanel ? "" : "hidden"} ${
@@ -692,6 +908,15 @@ export class ArtifactsPanel extends LitElement {
 						${Button({
 							variant: "ghost",
 							size: "sm",
+							onClick: () => {
+								this._isFullscreen = true;
+							},
+							title: i18n("Fullscreen"),
+							children: icon(Maximize2, "sm"),
+						})}
+						${Button({
+							variant: "ghost",
+							size: "sm",
 							onClick: () => this.onClose?.(),
 							title: i18n("Close artifacts"),
 							children: icon(X, "sm"),
@@ -700,8 +925,120 @@ export class ArtifactsPanel extends LitElement {
 				</div>
 
 				<!-- Content area where artifact elements are added programmatically -->
-				<div class="flex-1 overflow-hidden" ${ref(this.contentRef)}></div>
+				<div class="flex-1 overflow-hidden relative" ${ref(this.contentRef)} @dblclick=${() => {
+					this._isFullscreen = true;
+				}}>
+					${
+						isViewingOldVersion
+							? html`
+								<div class="absolute inset-0 flex flex-col bg-muted/50">
+									<div class="flex items-center gap-2 px-3 py-2 bg-muted border-b border-border">
+										${icon(History, "sm")}
+										<span class="text-sm text-muted-foreground">${i18n("Viewing version {version}").replace("{version}", String(viewingVersion))}</span>
+									</div>
+									<div class="flex-1 overflow-auto p-4">
+										<pre class="text-sm whitespace-pre-wrap font-mono">${activeArtifact?.versions.find((v) => v.version === viewingVersion)?.content ?? ""}</pre>
+									</div>
+								</div>
+							`
+							: ""
+					}
+				</div>
+
+				${
+					hasVersions
+						? html`
+							<!-- Version footer -->
+							<div class="version-dropdown-container relative border-t border-border bg-background px-3 py-2">
+								<button
+									class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+									@click=${() => {
+										this._versionDropdownOpen = !this._versionDropdownOpen;
+									}}
+								>
+									${icon(History, "sm")}
+									<span>
+										${i18n("Version")} ${viewingVersion}
+										${viewingVersion === currentVersion ? html`<span class="text-xs">(${i18n("current")})</span>` : ""}
+									</span>
+									${icon(ChevronDown, "sm")}
+								</button>
+
+								${
+									this._versionDropdownOpen
+										? html`
+											<div
+												class="absolute bottom-full left-0 mb-1 w-64 bg-popover border border-border rounded-md shadow-lg z-50 max-h-48 overflow-auto"
+											>
+												${activeArtifact?.versions
+													.slice()
+													.reverse()
+													.map((v) => {
+														const time = new Date(v.timestamp);
+														const timeStr = time.toLocaleTimeString(undefined, {
+															hour: "numeric",
+															minute: "2-digit",
+														});
+														const isSelected = v.version === viewingVersion;
+														return html`
+															<button
+																class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-muted transition-colors ${isSelected ? "bg-muted" : ""}"
+																@click=${() => {
+																	this._viewingVersion =
+																		v.version === currentVersion ? null : v.version;
+																	this._versionDropdownOpen = false;
+																	// When switching to current version, show the actual artifact element
+																	if (v.version === currentVersion && this._activeFilename) {
+																		const element = this.artifactElements.get(this._activeFilename);
+																		if (element) {
+																			element.style.display = "block";
+																		}
+																	} else if (this._activeFilename) {
+																		// Hide the artifact element when viewing old version
+																		const element = this.artifactElements.get(this._activeFilename);
+																		if (element) {
+																			element.style.display = "none";
+																		}
+																	}
+																	this.requestUpdate();
+																}}
+															>
+																<span class="w-4">${isSelected ? "●" : "○"}</span>
+																<span>
+																	${i18n("Version")} ${v.version}
+																	${v.version === currentVersion ? html`<span class="text-xs text-muted-foreground">(${i18n("current")})</span>` : ""}
+																</span>
+																<span class="ml-auto text-xs text-muted-foreground">${timeStr}</span>
+															</button>
+														`;
+													})}
+											</div>
+										`
+										: ""
+								}
+							</div>
+						`
+						: ""
+				}
 			</div>
+
+			${
+				this._isFullscreen && activeArtifact
+					? html`
+						<fullscreen-artifact
+							.artifact=${activeArtifact}
+							.allArtifacts=${artifacts}
+							.getArtifactElement=${(filename: string) => this.artifactElements.get(filename)}
+							.onClose=${() => {
+								this._isFullscreen = false;
+							}}
+							@navigate=${(e: CustomEvent<{ filename: string }>) => {
+								this.showArtifact(e.detail.filename);
+							}}
+						></fullscreen-artifact>
+					`
+					: ""
+			}
 		`;
 	}
 }

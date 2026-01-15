@@ -1,4 +1,5 @@
 import { html, LitElement, nothing } from "lit";
+import "./ConnectionStatus.js";
 import { customElement, property, state } from "lit/decorators.js";
 import { i18n } from "../utils/i18n.js";
 
@@ -237,6 +238,7 @@ export class Header extends LitElement {
 
 				<!-- Actions -->
 				<div class="flex items-center gap-2">
+					<pi-connection-status></pi-connection-status>
 					${this.renderModelBadge()}
 					${this.renderNewChatButton()}
 					${this.renderSettingsButton()}

@@ -66,3 +66,36 @@ body {
 	backdrop-filter: blur(10px);
 	max-width: 100%;
 }
+
+/* Search result highlighting */
+.search-match {
+	background-color: rgba(250, 204, 21, 0.4); /* Light yellow */
+	border-radius: 2px;
+	padding: 0 1px;
+}
+
+.search-match-current {
+	background-color: rgba(250, 204, 21, 0.7); /* Brighter yellow for current match */
+	outline: 2px solid var(--color-primary, #f59e0b);
+	outline-offset: 0;
+}
+
+/* Dark mode adjustments for search highlighting */
+@media (prefers-color-scheme: dark) {
+	.search-match {
+		background-color: rgba(202, 138, 4, 0.4);
+	}
+	
+	.search-match-current {
+		background-color: rgba(202, 138, 4, 0.7);
+	}
+}
+
+/* Support for theme class-based dark mode */
+.dark .search-match {
+	background-color: rgba(202, 138, 4, 0.4);
+}
+
+.dark .search-match-current {
+	background-color: rgba(202, 138, 4, 0.7);
+}

@@ -309,6 +309,72 @@ export async function main(args: string[]) {
 		}
 	}
 
+	// Serve mode: start WebSocket RPC server
+	if (parsed.serve) {
+		const { startRPCServer } = await import("./rpc/server.js");
+		const { writeFileSync, unlinkSync } = await import("node:fs");
+		const port = parsed.servePort ?? 8765;
+
+		// Connection file path - in cwd for easy access by web UI
+		const connectionFile = join(cwd, ".pi-server.json");
+
+		const server = await startRPCServer({
+			port,
+			host: "127.0.0.1",
+			sessionOptions: {
+				cwd,
+				agentDir,
+				authStorage,
+				modelRegistry,
+				eventBus,
+				settingsManager,
+				preloadedExtensions: extensionsResult,
+			},
+			onStart: (info) => {
+				// Write connection info to file
+				const connectionInfo = {
+					url: `ws://${info.host}:${info.port}`,
+					token: info.token,
+					pid: process.pid,
+					startedAt: new Date().toISOString(),
+				};
+				writeFileSync(connectionFile, JSON.stringify(connectionInfo, null, 2));
+
+				console.log(chalk.green(`✓ Pi RPC server running at ${chalk.cyan(`ws://${info.host}:${info.port}`)}`));
+				console.log(chalk.dim(`  Token: ${info.token}`));
+				console.log(chalk.dim(`  Connection file: ${connectionFile}`));
+				console.log(chalk.dim(`\nPress Ctrl+C to stop`));
+			},
+			onError: (error) => {
+				console.error(chalk.red(`Server error: ${error.message}`));
+			},
+			onConnect: (clientId) => {
+				console.log(chalk.dim(`Client connected: ${clientId.slice(0, 8)}...`));
+			},
+			onDisconnect: (clientId) => {
+				console.log(chalk.dim(`Client disconnected: ${clientId.slice(0, 8)}...`));
+			},
+		});
+
+		// Handle shutdown - clean up connection file
+		const cleanup = async () => {
+			console.log(chalk.dim("\nShutting down..."));
+			try {
+				unlinkSync(connectionFile);
+			} catch {
+				// Ignore - file may not exist
+			}
+			await server.stop();
+			process.exit(0);
+		};
+
+		process.on("SIGINT", cleanup);
+		process.on("SIGTERM", cleanup);
+
+		// Keep process alive
+		await new Promise(() => {});
+	}
+
 	if (parsed.mode === "rpc" && parsed.fileArgs.length > 0) {
 		console.error(chalk.red("Error: @file arguments are not supported in RPC mode"));
 		process.exit(1);

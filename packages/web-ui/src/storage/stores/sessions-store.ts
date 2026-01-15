@@ -133,4 +133,30 @@ export class SessionsStore extends Store {
 		allMetadata.sort((a, b) => b.lastModified.localeCompare(a.lastModified));
 		return allMetadata[0].id;
 	}
+
+	async getAll(): Promise<SessionData[]> {
+		const keys = await this.getBackend().keys("sessions");
+		const sessions: SessionData[] = [];
+		for (const key of keys) {
+			const session = await this.get(key);
+			if (session) {
+				sessions.push(session);
+			}
+		}
+		return sessions;
+	}
+
+	async clear(): Promise<void> {
+		await this.getBackend().transaction(["sessions", "sessions-metadata"], "readwrite", async (tx) => {
+			await tx.set("sessions", "__clear__", null); // Clear by deleting all
+			const keys = await this.getBackend().keys("sessions");
+			for (const key of keys) {
+				await tx.delete("sessions", key);
+			}
+			const metadataKeys = await this.getBackend().keys("sessions-metadata");
+			for (const key of metadataKeys) {
+				await tx.delete("sessions-metadata", key);
+			}
+		});
+	}
 }

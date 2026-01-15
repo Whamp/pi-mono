@@ -50,6 +50,7 @@ declare module "@mariozechner/mini-lit" {
 		"Failed to display text content": string;
 		"API keys are required to use AI models. Get your keys from the provider's website.": string;
 		console: string;
+		Copy: string;
 		"Copy output": string;
 		"Copied!": string;
 		"Error:": string;
@@ -122,6 +123,9 @@ declare module "@mariozechner/mini-lit" {
 		"Show artifacts": string;
 		"Close artifacts": string;
 		Artifacts: string;
+		Version: string;
+		current: string;
+		"Viewing version {version}": string;
 		"Copy HTML": string;
 		"Download HTML": string;
 		"Reload HTML": string;
@@ -131,6 +135,19 @@ declare module "@mariozechner/mini-lit" {
 		"Download Markdown": string;
 		Download: string;
 		"No logs for {filename}": string;
+		// JSON Viewer strings
+		"Copied path: {path}": string;
+		"Click to copy path": string;
+		Expand: string;
+		Collapse: string;
+		item: string;
+		items: string;
+		"Invalid JSON": string;
+		// Fullscreen artifact strings
+		Back: string;
+		Previous: string;
+		Next: string;
+		Fullscreen: string;
 		"API Keys Settings": string;
 		Settings: string;
 		"API Keys": string;
@@ -207,6 +224,9 @@ declare module "@mariozechner/mini-lit" {
 		"Anthropic Messages Compatible": string;
 		"Checking...": string;
 		Disconnected: string;
+		"Connecting...": string;
+		"Reconnecting...": string;
+		"Reconnecting (attempt {n})...": string;
 		// Sidebar strings
 		"New Chat": string;
 		"Search conversations": string;
@@ -217,13 +237,42 @@ declare module "@mariozechner/mini-lit" {
 		message: string;
 		"Session menu": string;
 		"Delete session": string;
+		"Remove attachment": string;
+		"Attach files": string;
+		"Send message": string;
+		"Stop generating": string;
 		// Search strings
 		"Clear search": string;
 		"No results found": string;
 		"Try a different search term": string;
+		"Pull to refresh": string;
+		"Release to refresh": string;
+		"Refreshing...": string;
+		// Search filter strings
+		Date: string;
+		Model: string;
+		All: string;
+		"All time": string;
+		"Toggle filters": string;
+		"Clear filters": string;
+		Filters: string;
+		// Find bar strings
+		"Find in conversation": string;
+		"Find...": string;
+		"Search query": string;
+		"Close find bar": string;
+		Close: string;
+		"Previous match": string;
+		"Next match": string;
+		"Match case": string;
+		"Use regex": string;
+		"Invalid regex": string;
+		"No results": string;
 		// Context menu strings
 		Rename: string;
 		Export: string;
+		"Export as JSON": string;
+		"Export as HTML": string;
 		"Delete conversation?": string;
 		"This action cannot be undone.": string;
 		// Header strings
@@ -270,6 +319,96 @@ declare module "@mariozechner/mini-lit" {
 		"Choose your preferred color scheme": string;
 		"Start with sidebar closed": string;
 		"On desktop, collapse the sidebar by default": string;
+		// Session info dialog strings
+		"Session Info": string;
+		"N/A": string;
+		Title: string;
+		Created: string;
+		Modified: string;
+		Duration: string;
+		User: string;
+		Messages: string;
+		Total: string;
+		"Token Usage": string;
+		"Estimated Cost": string;
+		Info: string;
+		// Keyboard shortcuts dialog strings
+		"Keyboard Shortcuts": string;
+		Navigation: string;
+		"Toggle sidebar": string;
+		Search: string;
+		"Close panels": string;
+		Chat: string;
+		"New chat": string;
+		"New line": string;
+		Find: string;
+		Help: string;
+		"Show keyboard shortcuts": string;
+		// Sidebar shortcut strings
+		"Navigate up": string;
+		"Navigate down": string;
+		"Select session": string;
+		// Artifacts shortcut strings
+		"Previous tab": string;
+		"Next tab": string;
+		"Close tab": string;
+		// Copy shortcut strings
+		"Copied to clipboard": string;
+		"Copy last response": string;
+		// Connection status strings
+		Connected: string;
+		Offline: string;
+		// Context warning strings
+		"Context is {percentage}% full": string;
+		"Compact Now": string;
+		// Connections dialog strings
+		"Server Connections": string;
+		"Add Connection": string;
+		"Edit Connection": string;
+		"Are you sure you want to delete this connection?": string;
+		"No connections yet": string;
+		"Last used": string;
+		Name: string;
+		URL: string;
+		Token: string;
+		"Enter auth token": string;
+		"Failed to save connection": string;
+		"e.g., Work Server": string;
+		Connect: string;
+		// Remote sessions dialog strings
+		"Remote Sessions": string;
+		"Failed to load sessions": string;
+		"No remote sessions yet": string;
+		"New Session": string;
+		// Compaction dialog strings
+		"Compact Conversation": string;
+		"Current tokens": string;
+		"Context limit": string;
+		"Instructions (optional)": string;
+		"Focus on the recent discussion about authentication...": string;
+		Compacting: string;
+		Compact: string;
+		"Compaction complete!": string;
+		Before: string;
+		After: string;
+		Saved: string;
+		// Fork indicator strings
+		"Fork branches": string;
+		"No branches yet": string;
+		"Fork at message {number}": string;
+		"View fork branches": string;
+		// Offline indicator strings
+		"You're offline": string;
+		"You're offline. 1 message pending.": string;
+		"You're offline. {count} messages pending.": string;
+		// Storage quota strings
+		"Storage Usage": string;
+		"{used} of {total} used": string;
+		Cache: string;
+		"Storage quota information not available": string;
+		"Unable to retrieve storage information": string;
+		"Storage nearly full": string;
+		"Consider clearing old data or managing your storage usage": string;
 	}
 }
 
@@ -327,6 +466,7 @@ export const translations = {
 		"API keys are required to use AI models. Get your keys from the provider's website.":
 			"API keys are required to use AI models. Get your keys from the provider's website.",
 		console: "console",
+		Copy: "Copy",
 		"Copy output": "Copy output",
 		"Copied!": "Copied!",
 		"Error:": "Error:",
@@ -398,6 +538,9 @@ export const translations = {
 		"Show artifacts": "Show artifacts",
 		"Close artifacts": "Close artifacts",
 		Artifacts: "Artifacts",
+		Version: "Version",
+		current: "current",
+		"Viewing version {version}": "Viewing version {version}",
 		"Copy HTML": "Copy HTML",
 		"Download HTML": "Download HTML",
 		"Reload HTML": "Reload HTML",
@@ -407,6 +550,19 @@ export const translations = {
 		"Download Markdown": "Download Markdown",
 		Download: "Download",
 		"No logs for {filename}": "No logs for {filename}",
+		// JSON Viewer strings
+		"Copied path: {path}": "Copied path: {path}",
+		"Click to copy path": "Click to copy path",
+		Expand: "Expand",
+		Collapse: "Collapse",
+		item: "item",
+		items: "items",
+		"Invalid JSON": "Invalid JSON",
+		// Fullscreen artifact strings
+		Back: "Back",
+		Previous: "Previous",
+		Next: "Next",
+		Fullscreen: "Fullscreen",
 		"API Keys Settings": "API Keys Settings",
 		Settings: "Settings",
 		"API Keys": "API Keys",
@@ -495,6 +651,9 @@ export const translations = {
 		"Anthropic Messages Compatible": "Anthropic Messages Compatible",
 		"Checking...": "Checking...",
 		Disconnected: "Disconnected",
+		"Connecting...": "Connecting...",
+		"Reconnecting...": "Reconnecting...",
+		"Reconnecting (attempt {n})...": "Reconnecting (attempt {n})...",
 		// Sidebar strings
 		"New Chat": "New Chat",
 		"Search conversations": "Search conversations",
@@ -505,13 +664,42 @@ export const translations = {
 		message: "message",
 		"Session menu": "Session menu",
 		"Delete session": "Delete session",
+		"Remove attachment": "Remove attachment",
+		"Attach files": "Attach files",
+		"Send message": "Send message",
+		"Stop generating": "Stop generating",
 		// Search strings
 		"Clear search": "Clear search",
 		"No results found": "No results found",
 		"Try a different search term": "Try a different search term",
+		"Pull to refresh": "Pull to refresh",
+		"Release to refresh": "Release to refresh",
+		"Refreshing...": "Refreshing...",
+		// Search filter strings
+		Date: "Date",
+		Model: "Model",
+		All: "All",
+		"All time": "All time",
+		"Toggle filters": "Toggle filters",
+		"Clear filters": "Clear filters",
+		Filters: "Filters",
+		// Find bar strings
+		"Find in conversation": "Find in conversation",
+		"Find...": "Find...",
+		"Search query": "Search query",
+		"Close find bar": "Close find bar",
+		Close: "Close",
+		"Previous match": "Previous match",
+		"Next match": "Next match",
+		"Match case": "Match case",
+		"Use regex": "Use regex",
+		"Invalid regex": "Invalid regex",
+		"No results": "No results",
 		// Context menu strings
 		Rename: "Rename",
 		Export: "Export",
+		"Export as JSON": "Export as JSON",
+		"Export as HTML": "Export as HTML",
 		"Delete conversation?": "Delete conversation?",
 		"This action cannot be undone.": "This action cannot be undone.",
 		// Header strings
@@ -558,6 +746,98 @@ export const translations = {
 		"Choose your preferred color scheme": "Choose your preferred color scheme",
 		"Start with sidebar closed": "Start with sidebar closed",
 		"On desktop, collapse the sidebar by default": "On desktop, collapse the sidebar by default",
+		// Session info dialog strings
+		"Session Info": "Session Info",
+		"N/A": "N/A",
+		Title: "Title",
+		Created: "Created",
+		Modified: "Modified",
+		Duration: "Duration",
+		User: "User",
+		Messages: "Messages",
+		Total: "Total",
+		"Token Usage": "Token Usage",
+		"Estimated Cost": "Estimated Cost",
+		Info: "Info",
+		// Keyboard shortcuts dialog strings
+		"Keyboard Shortcuts": "Keyboard Shortcuts",
+		Navigation: "Navigation",
+		"Toggle sidebar": "Toggle sidebar",
+		Search: "Search",
+		"Close panels": "Close panels",
+		Chat: "Chat",
+		"New chat": "New chat",
+		"New line": "New line",
+		Find: "Find",
+		Help: "Help",
+		"Show keyboard shortcuts": "Show keyboard shortcuts",
+		// Sidebar shortcut strings
+		"Navigate up": "Navigate up",
+		"Navigate down": "Navigate down",
+		"Select session": "Select session",
+		// Artifacts shortcut strings
+		"Previous tab": "Previous tab",
+		"Next tab": "Next tab",
+		"Close tab": "Close tab",
+		// Copy shortcut strings
+		"Copied to clipboard": "Copied to clipboard",
+		"Copy last response": "Copy last response",
+		// Connection status strings
+		Connected: "Connected",
+		Offline: "Offline",
+		// Context warning strings
+		"Context is {percentage}% full": "Context is {percentage}% full",
+		"Compact Now": "Compact Now",
+		// Connections dialog strings
+		"Server Connections": "Server Connections",
+		"Add Connection": "Add Connection",
+		"Edit Connection": "Edit Connection",
+		"Are you sure you want to delete this connection?": "Are you sure you want to delete this connection?",
+		"No connections yet": "No connections yet",
+		"Last used": "Last used",
+		Name: "Name",
+		URL: "URL",
+		Token: "Token",
+		"Enter auth token": "Enter auth token",
+		"Failed to save connection": "Failed to save connection",
+		"e.g., Work Server": "e.g., Work Server",
+		Connect: "Connect",
+		// Remote sessions dialog strings
+		"Remote Sessions": "Remote Sessions",
+		"Failed to load sessions": "Failed to load sessions",
+		"No remote sessions yet": "No remote sessions yet",
+		"New Session": "New Session",
+		// Compaction dialog strings
+		"Compact Conversation": "Compact Conversation",
+		"Current tokens": "Current tokens",
+		"Context limit": "Context limit",
+		"Instructions (optional)": "Instructions (optional)",
+		"Focus on the recent discussion about authentication...":
+			"Focus on the recent discussion about authentication...",
+		Compacting: "Compacting...",
+		Compact: "Compact",
+		"Compaction complete!": "Compaction complete!",
+		Before: "Before",
+		After: "After",
+		Saved: "Saved",
+		// Fork indicator strings
+		"Fork branches": "Fork branches",
+		"No branches yet": "No branches yet",
+		"Fork at message {number}": "Fork at message {number}",
+		"View fork branches": "View fork branches",
+		// Offline indicator strings
+		"You're offline": "You're offline",
+		"You're offline. 1 message pending.": "You're offline. 1 message pending.",
+		"You're offline. {count} messages pending.": "You're offline. {count} messages pending.",
+		// Storage quota strings
+		"Storage Usage": "Storage Usage",
+		"{used} of {total} used": "{used} of {total} used",
+		Cache: "Cache",
+		"Storage quota information not available": "Storage quota information not available",
+		"Unable to retrieve storage information": "Unable to retrieve storage information",
+		"Storage nearly full": "Storage nearly full",
+		"Consider clearing old data or managing your storage usage":
+			"Consider clearing old data or managing your storage usage",
 	},
 	de: {
 		...defaultGerman,
@@ -612,6 +892,7 @@ export const translations = {
 		"API keys are required to use AI models. Get your keys from the provider's website.":
 			"API-Schlüssel sind erforderlich, um KI-Modelle zu verwenden. Holen Sie sich Ihre Schlüssel von der Website des Anbieters.",
 		console: "Konsole",
+		Copy: "Kopieren",
 		"Copy output": "Ausgabe kopieren",
 		"Copied!": "Kopiert!",
 		"Error:": "Fehler:",
@@ -683,6 +964,9 @@ export const translations = {
 		"Show artifacts": "Artefakte anzeigen",
 		"Close artifacts": "Artefakte schließen",
 		Artifacts: "Artefakte",
+		Version: "Version",
+		current: "aktuell",
+		"Viewing version {version}": "Version {version} anzeigen",
 		"Copy HTML": "HTML kopieren",
 		"Download HTML": "HTML herunterladen",
 		"Reload HTML": "HTML neu laden",
@@ -692,6 +976,19 @@ export const translations = {
 		"Download Markdown": "Markdown herunterladen",
 		Download: "Herunterladen",
 		"No logs for {filename}": "Keine Logs für {filename}",
+		// JSON Viewer strings
+		"Copied path: {path}": "Pfad kopiert: {path}",
+		"Click to copy path": "Klicken um Pfad zu kopieren",
+		Expand: "Erweitern",
+		Collapse: "Einklappen",
+		item: "Element",
+		items: "Elemente",
+		"Invalid JSON": "Ungültiges JSON",
+		// Fullscreen artifact strings
+		Back: "Zurück",
+		Previous: "Vorheriger",
+		Next: "Nächster",
+		Fullscreen: "Vollbild",
 		"API Keys Settings": "API-Schlüssel Einstellungen",
 		Settings: "Einstellungen",
 		"API Keys": "API-Schlüssel",
@@ -780,6 +1077,9 @@ export const translations = {
 		"Anthropic Messages Compatible": "Anthropic Messages Kompatibel",
 		"Checking...": "Überprüfe...",
 		Disconnected: "Getrennt",
+		"Connecting...": "Verbinde...",
+		"Reconnecting...": "Verbinde erneut...",
+		"Reconnecting (attempt {n})...": "Verbinde erneut (Versuch {n})...",
 		// Sidebar strings
 		"New Chat": "Neuer Chat",
 		"Search conversations": "Konversationen suchen",
@@ -790,13 +1090,42 @@ export const translations = {
 		message: "Nachricht",
 		"Session menu": "Sitzungsmenü",
 		"Delete session": "Sitzung löschen",
+		"Remove attachment": "Anhang entfernen",
+		"Attach files": "Dateien anhängen",
+		"Send message": "Nachricht senden",
+		"Stop generating": "Generierung stoppen",
 		// Search strings
 		"Clear search": "Suche löschen",
 		"No results found": "Keine Ergebnisse gefunden",
 		"Try a different search term": "Versuchen Sie einen anderen Suchbegriff",
+		"Pull to refresh": "Zum Aktualisieren ziehen",
+		"Release to refresh": "Zum Aktualisieren loslassen",
+		"Refreshing...": "Aktualisiere...",
+		// Search filter strings
+		Date: "Datum",
+		Model: "Modell",
+		All: "Alle",
+		"All time": "Gesamte Zeit",
+		"Toggle filters": "Filter umschalten",
+		"Clear filters": "Filter löschen",
+		Filters: "Filter",
+		// Find bar strings
+		"Find in conversation": "In Konversation suchen",
+		"Find...": "Suchen...",
+		"Search query": "Suchanfrage",
+		"Close find bar": "Suchleiste schließen",
+		Close: "Schließen",
+		"Previous match": "Vorheriger Treffer",
+		"Next match": "Nächster Treffer",
+		"Match case": "Groß-/Kleinschreibung",
+		"Use regex": "Regex verwenden",
+		"Invalid regex": "Ungültiger Regex",
+		"No results": "Keine Treffer",
 		// Context menu strings
 		Rename: "Umbenennen",
 		Export: "Exportieren",
+		"Export as JSON": "Als JSON exportieren",
+		"Export as HTML": "Als HTML exportieren",
 		"Delete conversation?": "Konversation löschen?",
 		"This action cannot be undone.": "Diese Aktion kann nicht rückgängig gemacht werden.",
 		// Header strings
@@ -844,6 +1173,98 @@ export const translations = {
 		"Choose your preferred color scheme": "Wählen Sie Ihr bevorzugtes Farbschema",
 		"Start with sidebar closed": "Mit geschlossener Seitenleiste starten",
 		"On desktop, collapse the sidebar by default": "Auf dem Desktop die Seitenleiste standardmäßig einklappen",
+		// Session info dialog strings
+		"Session Info": "Sitzungsinfo",
+		"N/A": "N/V",
+		Title: "Titel",
+		Created: "Erstellt",
+		Modified: "Geändert",
+		Duration: "Dauer",
+		User: "Benutzer",
+		Messages: "Nachrichten",
+		Total: "Gesamt",
+		"Token Usage": "Token-Nutzung",
+		"Estimated Cost": "Geschätzte Kosten",
+		Info: "Info",
+		// Keyboard shortcuts dialog strings
+		"Keyboard Shortcuts": "Tastaturkürzel",
+		Navigation: "Navigation",
+		"Toggle sidebar": "Seitenleiste umschalten",
+		Search: "Suche",
+		"Close panels": "Panels schließen",
+		Chat: "Chat",
+		"New chat": "Neuer Chat",
+		"New line": "Neue Zeile",
+		Find: "Suchen",
+		Help: "Hilfe",
+		"Show keyboard shortcuts": "Tastaturkürzel anzeigen",
+		// Sidebar shortcut strings
+		"Navigate up": "Nach oben navigieren",
+		"Navigate down": "Nach unten navigieren",
+		"Select session": "Sitzung auswählen",
+		// Artifacts shortcut strings
+		"Previous tab": "Vorheriger Tab",
+		"Next tab": "Nächster Tab",
+		"Close tab": "Tab schließen",
+		// Copy shortcut strings
+		"Copied to clipboard": "In Zwischenablage kopiert",
+		"Copy last response": "Letzte Antwort kopieren",
+		// Connection status strings
+		Connected: "Verbunden",
+		Offline: "Offline",
+		// Context warning strings
+		"Context is {percentage}% full": "Kontext ist zu {percentage}% gefüllt",
+		"Compact Now": "Jetzt komprimieren",
+		// Connections dialog strings
+		"Server Connections": "Serververbindungen",
+		"Add Connection": "Verbindung hinzufügen",
+		"Edit Connection": "Verbindung bearbeiten",
+		"Are you sure you want to delete this connection?": "Sind Sie sicher, dass Sie diese Verbindung löschen möchten?",
+		"No connections yet": "Noch keine Verbindungen",
+		"Last used": "Zuletzt verwendet",
+		Name: "Name",
+		URL: "URL",
+		Token: "Token",
+		"Enter auth token": "Auth-Token eingeben",
+		"Failed to save connection": "Fehler beim Speichern der Verbindung",
+		"e.g., Work Server": "z.B. Arbeitsserver",
+		Connect: "Verbinden",
+		// Remote sessions dialog strings
+		"Remote Sessions": "Remote-Sitzungen",
+		"Failed to load sessions": "Fehler beim Laden der Sitzungen",
+		"No remote sessions yet": "Noch keine Remote-Sitzungen",
+		"New Session": "Neue Sitzung",
+		// Compaction dialog strings
+		"Compact Conversation": "Konversation komprimieren",
+		"Current tokens": "Aktuelle Tokens",
+		"Context limit": "Kontextlimit",
+		"Instructions (optional)": "Anweisungen (optional)",
+		"Focus on the recent discussion about authentication...":
+			"Fokus auf die aktuelle Diskussion über Authentifizierung...",
+		Compacting: "Komprimiere...",
+		Compact: "Komprimieren",
+		"Compaction complete!": "Komprimierung abgeschlossen!",
+		Before: "Vorher",
+		After: "Nachher",
+		Saved: "Gespart",
+		// Fork indicator strings
+		"Fork branches": "Verzweigungen",
+		"No branches yet": "Noch keine Verzweigungen",
+		"Fork at message {number}": "Verzweigt bei Nachricht {number}",
+		"View fork branches": "Verzweigungen anzeigen",
+		// Offline indicator strings
+		"You're offline": "Sie sind offline",
+		"You're offline. 1 message pending.": "Sie sind offline. 1 Nachricht ausstehend.",
+		"You're offline. {count} messages pending.": "Sie sind offline. {count} Nachrichten ausstehend.",
+		// Storage quota strings
+		"Storage Usage": "Speichernutzung",
+		"{used} of {total} used": "{used} von {total} verwendet",
+		Cache: "Cache",
+		"Storage quota information not available": "Speicherquoten-Informationen nicht verfügbar",
+		"Unable to retrieve storage information": "Speicherinformationen können nicht abgerufen werden",
+		"Storage nearly full": "Speicher fast voll",
+		"Consider clearing old data or managing your storage usage":
+			"Erwägen Sie das Löschen alter Daten oder die Verwaltung Ihrer Speichernutzung",
 	},
 };
 

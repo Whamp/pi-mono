@@ -5,6 +5,7 @@ import {
 	ApiKeyPromptDialog,
 	AppStorage,
 	ChatPanel,
+	ConnectionsStore,
 	CustomProvidersStore,
 	createJavaScriptReplTool,
 	exportSessionAsJson,
@@ -38,6 +39,7 @@ const settings = new SettingsStore();
 const providerKeys = new ProviderKeysStore();
 const sessions = new SessionsStore();
 const customProviders = new CustomProvidersStore();
+const connections = new ConnectionsStore();
 
 // Gather configs
 const configs = [
@@ -45,13 +47,14 @@ const configs = [
 	SessionsStore.getMetadataConfig(),
 	providerKeys.getConfig(),
 	customProviders.getConfig(),
+	connections.getConfig(),
 	sessions.getConfig(),
 ];
 
 // Create backend
 const backend = new IndexedDBStorageBackend({
 	dbName: "pi-web-ui-example",
-	version: 2, // Incremented for custom-providers store
+	version: 3, // Incremented for connections store
 	stores: configs,
 });
 
@@ -59,10 +62,11 @@ const backend = new IndexedDBStorageBackend({
 settings.setBackend(backend);
 providerKeys.setBackend(backend);
 customProviders.setBackend(backend);
+connections.setBackend(backend);
 sessions.setBackend(backend);
 
 // Create and set app storage
-const storage = new AppStorage(settings, providerKeys, sessions, customProviders, backend);
+const storage = new AppStorage(settings, providerKeys, sessions, customProviders, connections, backend);
 setAppStorage(storage);
 
 let currentSessionId: string | undefined;

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Banner Component Test</title>
+	<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+	<h1 class="text-2xl font-bold mb-4">Banner Component Test</h1>
+	<div class="space-y-4">
+		<button onclick="showInfoBanner()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+			Show Info Banner
+		</button>
+		<button onclick="showWarningBanner()" class="px-4 py-2 bg-amber-500 text-white rounded hover:bg-amber-600">
+			Show Warning Banner with Action
+		</button>
+		<button onclick="showErrorBanner()" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+			Show Error Banner with Action
+		</button>
+		<button onclick="dismissAllBanners()" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+			Dismiss All Banners
+		</button>
+	</div>
+
+	<!-- Add spacer so banners don't cover content -->
+	<div class="mt-8 p-4 bg-white rounded shadow">
+		<p>This content is below the banner area. Banners should appear at the top.</p>
+	</div>
+
+	<script type="module">
+		import { showBanner, dismissAllBanners } from './dist/utils/banner.js';
+
+		// Make functions available globally
+		window.showBanner = showBanner;
+		window.dismissAllBanners = dismissAllBanners;
+		window.showInfoBanner = () => {
+			showBanner({
+				message: "This is an informational banner.",
+				variant: "info",
+			});
+		};
+		window.showWarningBanner = () => {
+			showBanner({
+				id: "rate-limit",
+				message: "Rate limit reached. Retry in 45 seconds.",
+				variant: "warning",
+				actionLabel: "Retry Now",
+				onAction: () => alert("Retry clicked!"),
+			});
+		};
+		window.showErrorBanner = () => {
+			showBanner({
+				id: "connection-error",
+				message: "Connection lost. Attempting to reconnect...",
+				variant: "error",
+				actionLabel: "Retry",
+				onAction: () => alert("Retrying connection..."),
+			});
+		};
+	</script>
+</body>
+</html>

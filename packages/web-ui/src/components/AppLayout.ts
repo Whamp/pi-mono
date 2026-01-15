@@ -1,5 +1,6 @@
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { ShortcutsHelpDialog } from "../dialogs/ShortcutsHelpDialog.js";
 import { createSwipeHandler, type SwipeHandler } from "../utils/gesture-utils.js";
 import { createShortcutManager, type ShortcutManager } from "../utils/keyboard-shortcuts.js";
 
@@ -116,6 +117,15 @@ export class AppLayout extends LitElement {
 				}
 			},
 			description: "Close modals and panels",
+		});
+
+		// Cmd/Ctrl+/: Show keyboard shortcuts help
+		this.shortcutManager.register({
+			key: "/",
+			meta: true,
+			ctrl: true,
+			handler: () => ShortcutsHelpDialog.open(),
+			description: "Show keyboard shortcuts",
 		});
 
 		this.shortcutManager.attach();
