@@ -5,9 +5,12 @@ export type { Model } from "@mariozechner/pi-ai";
 export { ChatPanel } from "./ChatPanel.js";
 // Components
 export { AgentInterface } from "./components/AgentInterface.js";
+export { AppLayout } from "./components/AppLayout.js";
 export { AttachmentTile } from "./components/AttachmentTile.js";
 export { ConsoleBlock } from "./components/ConsoleBlock.js";
+export { ErrorBanner, type ErrorType } from "./components/ErrorBanner.js";
 export { ExpandableSection } from "./components/ExpandableSection.js";
+export { Header } from "./components/Header.js";
 export { Input } from "./components/Input.js";
 export { MessageEditor } from "./components/MessageEditor.js";
 export { MessageList } from "./components/MessageList.js";
@@ -36,6 +39,8 @@ export {
 	type SandboxResult,
 	type SandboxUrlProvider,
 } from "./components/SandboxedIframe.js";
+export { SessionItem } from "./components/SessionItem.js";
+export { type SessionMetadata as SidebarSessionMetadata, type SessionUsage, Sidebar } from "./components/Sidebar.js";
 export { StreamingMessageContainer } from "./components/StreamingMessageContainer.js";
 // Sandbox Runtime Providers
 export { ArtifactsRuntimeProvider } from "./components/sandbox/ArtifactsRuntimeProvider.js";
@@ -49,6 +54,7 @@ export { RuntimeMessageBridge } from "./components/sandbox/RuntimeMessageBridge.
 export { RUNTIME_MESSAGE_ROUTER } from "./components/sandbox/RuntimeMessageRouter.js";
 export type { SandboxRuntimeProvider } from "./components/sandbox/SandboxRuntimeProvider.js";
 export { ThinkingBlock } from "./components/ThinkingBlock.js";
+export { Toast, type ToastVariant } from "./components/Toast.js";
 export { ApiKeyPromptDialog } from "./dialogs/ApiKeyPromptDialog.js";
 export { AttachmentOverlay } from "./dialogs/AttachmentOverlay.js";
 // Dialogs
@@ -56,7 +62,7 @@ export { ModelSelector } from "./dialogs/ModelSelector.js";
 export { PersistentStorageDialog } from "./dialogs/PersistentStorageDialog.js";
 export { ProvidersModelsTab } from "./dialogs/ProvidersModelsTab.js";
 export { SessionListDialog } from "./dialogs/SessionListDialog.js";
-export { ApiKeysTab, ProxyTab, SettingsDialog, SettingsTab } from "./dialogs/SettingsDialog.js";
+export { ApiKeysTab, PreferencesTab, ProxyTab, SettingsDialog, SettingsTab } from "./dialogs/SettingsDialog.js";
 // Prompts
 export {
 	ARTIFACTS_RUNTIME_PROVIDER_DESCRIPTION_RO,
@@ -75,6 +81,7 @@ export type {
 export { CustomProvidersStore } from "./storage/stores/custom-providers-store.js";
 export { ProviderKeysStore } from "./storage/stores/provider-keys-store.js";
 export { SessionsStore } from "./storage/stores/sessions-store.js";
+export type { ThemePreference } from "./storage/stores/settings-store.js";
 export { SettingsStore } from "./storage/stores/settings-store.js";
 export type {
 	IndexConfig,
@@ -110,6 +117,16 @@ export type { Attachment } from "./utils/attachment-utils.js";
 // Utils
 export { loadAttachment } from "./utils/attachment-utils.js";
 export { clearAuthToken, getAuthToken } from "./utils/auth-token.js";
+export type { DateGroup, GroupedSessions } from "./utils/date-utils.js";
+export { groupSessionsByDate } from "./utils/date-utils.js";
+export type { ExportableSession } from "./utils/export-utils.js";
+export { exportSessionAsJson } from "./utils/export-utils.js";
 export { formatCost, formatModelCost, formatTokenCount, formatUsage } from "./utils/format.js";
+export type { SwipeHandler, SwipeOptions } from "./utils/gesture-utils.js";
+export { createSwipeHandler } from "./utils/gesture-utils.js";
 export { i18n, setLanguage, translations } from "./utils/i18n.js";
+export type { KeyboardShortcut, ShortcutManager } from "./utils/keyboard-shortcuts.js";
+export { createShortcutManager } from "./utils/keyboard-shortcuts.js";
 export { applyProxyIfNeeded, createStreamFn, isCorsError, shouldUseProxyForProvider } from "./utils/proxy-utils.js";
+export type { ToastOptions } from "./utils/toast.js";
+export { dismissAllToasts, showToast } from "./utils/toast.js";

@@ -252,6 +252,14 @@ export class AgentInterface extends LitElement {
 		}
 	}
 
+	private handleSuggestedPrompt = (prompt: string) => {
+		this.setInput(prompt);
+		// Focus the message editor
+		if (this._messageEditor) {
+			this._messageEditor.focus();
+		}
+	};
+
 	private renderMessages() {
 		if (!this.session)
 			return html`<div class="p-4 text-center text-muted-foreground">${i18n("No session available")}</div>`;
@@ -272,6 +280,7 @@ export class AgentInterface extends LitElement {
 					.pendingToolCalls=${this.session ? this.session.state.pendingToolCalls : new Set<string>()}
 					.isStreaming=${state.isStreaming}
 					.onCostClick=${this.onCostClick}
+					.onSuggestedPrompt=${this.handleSuggestedPrompt}
 				></message-list>
 
 				<!-- Streaming message container - manages its own updates -->

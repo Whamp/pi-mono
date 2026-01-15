@@ -1,0 +1,30 @@
+# Web UI Progress Notes
+
+## Task: Update Package Exports (2026-01-14)
+
+### Status: Completed - No Changes Required
+
+### Verification Results
+All required exports were already present in `packages/web-ui/src/index.ts`:
+
+**Components:**
+- `AppLayout` ✓
+- `Sidebar` ✓ (with `SidebarSessionMetadata` aliased from `SessionMetadata`, `SessionUsage`) ✓
+- `SessionItem` ✓
+- `Header` ✓
+- `Toast` ✓ (with `ToastVariant`) ✓
+- `ErrorBanner` ✓ (with `ErrorType`) ✓
+
+**Utilities:**
+- `date-utils.ts`: `groupSessionsByDate`, `DateGroup`, `GroupedSessions` ✓
+- `export-utils.ts`: `exportSessionAsJson`, `ExportableSession` ✓
+- `gesture-utils.ts`: `createSwipeHandler`, `SwipeHandler`, `SwipeOptions` ✓
+- `keyboard-shortcuts.ts`: `createShortcutManager`, `ShortcutManager`, `KeyboardShortcut` ✓
+- `toast.ts`: `showToast`, `dismissAllToasts`, `ToastOptions` ✓
+
+**Other:**
+- `PreferencesTab` from `SettingsDialog.ts` ✓
+- `ThemePreference` type from `settings-store.ts` ✓
+
+### Validation
+- `npm run check`: Passed with no errors

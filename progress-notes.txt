@@ -1,0 +1,992 @@
+## Date Grouping for Session List - COMPLETED
+
+### Files Created
+- `packages/web-ui/src/utils/date-utils.ts` - New utility for date grouping
+
+### Files Modified
+- `packages/web-ui/src/components/Sidebar.ts` - Added date group rendering with sticky headers
+- `packages/web-ui/src/utils/i18n.ts` - Added translations for "Last 7 Days", "Last 30 Days", "Older"
+- `packages/web-ui/src/index.ts` - Added exports for date-utils types and functions
+
+### Implementation Details
+1. Created `groupSessionsByDate<T>()` generic function that groups any object with `lastModified` field
+2. Date boundaries calculated using calendar days (not 24h periods):
+   - Today: same calendar day
+   - Yesterday: previous calendar day
+   - Last 7 Days: 2-7 days ago
+   - Last 30 Days: 8-30 days ago
+   - Older: more than 30 days
+3. Sidebar renders sticky group headers with:
+   - `sticky top-0 z-10` for sticky positioning within scroll container
+   - `bg-background/95 backdrop-blur-sm` for semi-transparent background
+   - `text-xs font-semibold uppercase tracking-wide` for styling
+4. Groups maintain original session order (newest first assumed)
+5. Only non-empty groups are rendered
+6. Full i18n support (English and German)
+
+### Verification
+- `npm run check` passes with no errors
+
+---
+
+## Sidebar Search - COMPLETED
+
+### Files Modified
+- `packages/web-ui/src/components/Sidebar.ts` - Added search functionality
+- `packages/web-ui/src/utils/i18n.ts` - Added translations for search strings
+
+### Implementation Details
+1. Added `@state() private searchQuery = ""` for reactive search state
+2. Added debounced search handling (300ms delay):
+   - `searchTimeout?: number` for debounce timer
+   - `handleSearchInput()` clears timeout and sets new one
+   - `handleSearchClear()` resets query and clears input field
+3. Added `getFilteredSessions()` method:
+   - Returns all sessions if query is empty
+   - Case-insensitive filtering on `title` and `preview`
+4. Updated `renderSearchInput()`:
+   - Added `@input` handler for controlled behavior
+   - Added clear button (×) that appears when query has value
+   - Changed padding from `pr-4` to `pr-8` to accommodate clear button
+5. Updated `renderSessionList()`:
+   - Filters sessions BEFORE date grouping
+   - Shows "No results found" state with search icon when search active but no matches
+   - Different empty state for no sessions vs no search results
+
+### i18n Additions
+- "Clear search" / "Suche löschen"
+- "No results found" / "Keine Ergebnisse gefunden"
+- "Try a different search term" / "Versuchen Sie einen anderen Suchbegriff"
+
+### Verification
+- `npm run check` passes with no errors
+- Search filters sessions in real-time with 300ms debounce
+- Clear button (×) appears when search has value
+- Empty search results show appropriate "No results" message with search icon
+
+---
+
+## Session Context Menu - COMPLETED
+
+### Files Modified
+- `packages/web-ui/src/components/Sidebar.ts` - Added context menu and delete confirmation dialog
+- `packages/web-ui/src/utils/i18n.ts` - Added translations for context menu strings
+
+### Implementation Details
+1. Added new state properties:
+   - `@state() private contextMenuSessionId: string | null = null`
+   - `@state() private contextMenuPosition: { x: number; y: number } | null = null`
+   - `@state() private showDeleteConfirm: string | null = null`
+
+2. Added new callback prop:
+   - `@property({ attribute: false }) onDelete?: (sessionId: string) => void`
+
+3. Context menu handling:
+   - `handleSessionContextMenu()` - Opens menu at click position with viewport boundary checks
+   - `closeContextMenu()` - Closes menu and removes click listener
+   - `boundHandleClickOutside` - Bound reference for document click listener
+   - Uses `setTimeout` to defer click listener attachment (prevents immediate close)
+
+4. Delete confirmation:
+   - `handleDeleteClick()` - Shows confirmation dialog
+   - `closeDeleteConfirm()` - Closes dialog
+   - `confirmDelete()` - Calls `onDelete` callback and closes dialog
+
+5. Rename option:
+   - `handleRenameClick()` - Placeholder that closes menu (actual implementation in Task 6)
+
+6. UI Implementation:
+   - Context menu uses `fixed z-50` positioning with `bg-popover` styling
+   - Delete button uses `text-destructive` color
+   - Confirmation dialog uses modal pattern with backdrop (`bg-black/50`)
+   - Buttons styled consistently with existing dialog patterns
+
+7. Click-outside handling:
+   - Document click listener added when menu opens
+   - Removed on `disconnectedCallback` and when menu closes
+   - Uses `.context-menu-container` class to detect outside clicks
+
+### i18n Additions
+- "Rename" / "Umbenennen"
+- "Delete conversation?" / "Konversation löschen?"
+- "This action cannot be undone." / "Diese Aktion kann nicht rückgängig gemacht werden."
+
+### Verification
+- `npm run check` passes with no errors
+- Context menu opens on ⋮ click
+- Delete shows confirmation dialog
+- Rename option exists (functional implementation pending Task 6)
+
+## Inline Session Rename - Completed 2026-01-14 17:41
+
+### Changes Made
+
+**SessionItem.ts:**
+- Added `isEditing` property (boolean)
+- Added `onRename` callback prop (newTitle: string) => void
+- Added `onCancelEdit` callback prop () => void
+- Added `updated()` lifecycle method to auto-focus and select input text
+- Added `handleEditKeydown()` - Enter saves, Escape cancels
+- Added `handleEditBlur()` - cancels edit on focus loss
+- Title row now shows input field when isEditing is true
+
+**Sidebar.ts:**
+- Added `editingSessionId` state to track which session is being edited
+- Added `onRename` callback prop for external handling
+- Updated `handleRenameClick()` to set editingSessionId
+- Added `handleSessionRename()` to call onRename and clear edit state
+- Added `handleCancelEdit()` to clear edit state
+- Updated `renderSessionItem()` to pass isEditing, onRename, onCancelEdit props
+
+### Verification
+- npm run check passes with no errors
+
+
+## Session Export Feature (2026-01-14)
+
+### Completed
+Added Export option to sidebar session context menu.
+
+### Files Created
+- `packages/web-ui/src/utils/export-utils.ts` - Export utility with ExportableSession interface and exportSessionAsJson function
+
+### Files Modified
+- `packages/web-ui/src/components/Sidebar.ts` - Added onExport callback prop, handleExportClick method, and Export button in context menu (between Rename and Delete)
+- `packages/web-ui/src/utils/i18n.ts` - Added "Export" translation key for EN/DE
+- `packages/web-ui/src/index.ts` - Exported ExportableSession type and exportSessionAsJson function
+
+### Validation
+- `npm run check`: PASS (biome lint, tsc, tsgo all clean)
+
+
+## Task: Enhance Session Metadata Tracking
+
+### Completed
+- Extended `SessionMetadata` interface in `packages/web-ui/src/components/Sidebar.ts` with optional `usage` field
+- Added `SessionUsage` interface with `totalInputTokens`, `totalOutputTokens`, `totalCost` fields
+- Updated `packages/web-ui/src/components/SessionItem.ts` to display cost in metadata row when usage data is present
+- Exported `SessionUsage` type from `packages/web-ui/src/index.ts`
+
+### Files Changed
+- `packages/web-ui/src/components/Sidebar.ts` - Added SessionUsage interface and optional usage field to SessionMetadata
+- `packages/web-ui/src/components/SessionItem.ts` - Added formatSessionCost helper, display cost in metadata row
+- `packages/web-ui/src/index.ts` - Exported SessionUsage type
+
+### Validation Output
+- npm run check: clean (no errors, no warnings)
+- Biome lint: Checked 407 files, no fixes needed
+- TypeScript: no errors
+
+### Display Format
+Cost appears in session item metadata row as:
+- `12:34 PM · 5 messages` (no usage data)
+- `12:34 PM · 5 messages · $0.02` (with usage data)
+- `12:34 PM · 5 messages · <$0.01` (for costs under 1 cent)
+
+### Notes
+- The storage type (`packages/web-ui/src/storage/types.ts`) already has full usage tracking
+- The Sidebar's SessionMetadata is a simpler UI-focused interface used by SessionItem
+- Consuming applications populate usage data when saving sessions; this task just ensures UI display
+
+## AppLayout Component - Completed
+
+### Files Created/Modified:
+- `packages/web-ui/src/components/AppLayout.ts` - NEW FILE
+- `packages/web-ui/src/index.ts` - Added export
+
+### Implementation Details:
+
+**Component Structure:**
+- Lit component with decorators
+- Light DOM (`createRenderRoot() { return this; }`)
+- Tailwind CSS classes
+- Tag name: `pi-app-layout`
+
+**Props:**
+- `sidebarOpen: boolean` - Controls sidebar visibility
+- `artifactsOpen: boolean` - Controls artifacts panel visibility
+- `onSidebarToggle?: () => void` - Callback for sidebar toggle
+- `onArtifactsToggle?: () => void` - Callback for artifacts toggle
+
+**Slots:**
+- `sidebar` - Sidebar content slot
+- `header` - Header content slot
+- Default slot - Main chat content
+
+**Responsive Breakpoints:**
+- Mobile (<768px): Sidebar and artifacts as full-screen overlay
+- Tablet (768-1023px): Sidebar as drawer, artifacts as overlay
+- Desktop (≥1024px): Sidebar visible, artifacts as overlay
+- Desktop XL (≥1280px): Sidebar and artifacts as side panels
+
+**Features:**
+- Responsive state tracking via window resize listener
+- Backdrop overlay for drawer/overlay modes
+- Smooth slide transitions (300ms duration)
+- Proper z-index layering (z-10 for backdrop, z-20 for drawers)
+
+### Validation:
+- `npm run check` - PASSED (no errors)
+
+## Header Component - Completed
+
+### Files Created
+- `packages/web-ui/src/components/Header.ts` - New header component with:
+  - Hamburger menu button (conditionally shown via `showMenuButton`)
+  - Editable session title (click to edit, Enter saves, Escape cancels)
+  - Model badge with thinking level abbreviation
+  - Streaming indicator with animated dot
+  - New chat and settings action buttons
+  - Responsive design (hides model badge and new chat on mobile)
+
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added Header export
+- `packages/web-ui/src/utils/i18n.ts` - Added i18n keys:
+  - "Open menu"
+  - "Responding..."
+  - "Click to edit title"
+
+### Verification
+- `npm run check` passes with no errors
+- All TypeScript types are correct
+- Biome linting passes
+
+### Component API
+```typescript
+@property({ type: String }) title = 'New Chat';
+@property({ type: Boolean }) showMenuButton = false;
+@property({ type: String }) modelName?: string;
+@property({ type: String }) thinkingLevel?: string;
+@property({ type: Boolean }) isStreaming = false;
+@property({ attribute: false }) onMenuClick?: () => void;
+@property({ attribute: false }) onTitleEdit?: (newTitle: string) => void;
+@property({ attribute: false }) onModelClick?: () => void;
+@property({ attribute: false }) onSettingsClick?: () => void;
+@property({ attribute: false }) onNewChatClick?: () => void;
+```
+
+## Artifacts Panel Integration in Layout - VERIFIED
+
+### Task
+Verify that AppLayout correctly handles the ArtifactsPanel at all breakpoints.
+
+### Files Examined
+- `packages/web-ui/src/components/AppLayout.ts` - Layout orchestration
+- `packages/web-ui/src/tools/artifacts/artifacts.ts` - ArtifactsPanel component
+- `packages/web-ui/specs/ui/artifacts.md` - Specification
+
+### Analysis Results
+
+**AppLayout Breakpoints (Correct):**
+- Mobile (<768px): Artifacts as full-width drawer with slide animation
+- Tablet (768-1023px): Artifacts as 400px drawer from right with slide animation
+- Desktop (1024-1279px): Artifacts as 400px drawer from right with slide animation
+- Desktop XL (≥1280px): Artifacts as static 400px side panel
+
+**Artifacts Container Rendering Logic (Correct):**
+```typescript
+${this.artifactsOpen || !this.isDesktopXL ? html`<div class="${this.getArtifactsClasses()}"><slot name="artifacts"></slot></div>` : nothing}
+```
+- Desktop XL, closed: Container not rendered (no space reserved) ✓
+- Desktop XL, open: Container rendered as 400px side panel ✓
+- Other screens: Container always in DOM for slide animations ✓
+
+**getArtifactsClasses() (Correct):**
+- Desktop XL + open: `relative w-[400px] flex-shrink-0 border-l border-border`
+- Other cases: `fixed inset-y-0 right-0 z-20 w-[400px|w-full] transform transition-transform duration-300`
+
+**Backdrop Logic (Correct):**
+- Mobile: Shows for sidebar OR artifacts
+- Tablet: Shows for sidebar OR artifacts
+- Desktop (non-XL): Shows for artifacts only
+- Desktop XL: No backdrop (both are side panels)
+
+### Usage Note for Parent Components
+When using ArtifactsPanel inside AppLayout:
+- Set `artifactsPanel.overlay = false` - AppLayout handles all positioning
+- AppLayout's slot container provides drawer/side-panel behavior
+- ArtifactsPanel just fills its container with `relative h-full`
+
+The `overlay` prop on ArtifactsPanel is designed for standalone usage (like ChatPanel) where no external layout component handles positioning. When used with AppLayout, overlay should be false.
+
+### Verification
+- `npm run check`: PASSED (no errors)
+- All breakpoint scenarios verified against requirements
+- No code changes needed
+
+### Notes
+- Desktop XL side panel appears/disappears instantly (no animation) - this is intentional for "static side panel" behavior
+- Slide animations work correctly for drawer mode on mobile/tablet/desktop
+- 300ms transition duration applied correctly via `transition-transform duration-300`
+
+## Refactor Example App to Use New Layout - Completed
+
+### Task
+Replace the current render logic in the example app with `<pi-app-layout>`, `<pi-sidebar>`, and `<pi-header>` components.
+
+### Analysis
+The example app already had the new layout components implemented. The issues found were:
+
+1. **Incorrect imports**: `AppLayout`, `Header`, `Sidebar` were imported as classes but used as custom elements via HTML templates. Biome flagged them as unused.
+
+2. **Outdated event handling**: Agent subscription used `"state-update"` event type which doesn't exist. The Agent emits events like `"message_start"`, `"message_end"`, `"turn_start"`, `"turn_end"`, `"agent_start"`, `"agent_end"`, `"message_update"`.
+
+3. **Stale dist files**: The built package didn't include the new components since the exports were added after the last build.
+
+### Changes Made
+
+**File: `packages/web-ui/example/src/main.ts`**
+
+1. Changed imports from class imports to side-effect imports:
+```typescript
+// Before
+import { AppLayout, Header, Sidebar, ... } from "@mariozechner/pi-web-ui";
+
+// After - import from main package (for types/utilities)
+import { type SidebarSessionMetadata, ... } from "@mariozechner/pi-web-ui";
+// Side-effect imports: these register custom elements
+import "@mariozechner/pi-web-ui/dist/components/AppLayout.js";
+import "@mariozechner/pi-web-ui/dist/components/Header.js";
+import "@mariozechner/pi-web-ui/dist/components/Sidebar.js";
+```
+
+2. Fixed agent subscription to use correct event types:
+```typescript
+// Before
+agentUnsubscribe = agent.subscribe((event) => {
+  if (event.type === "state-update") {
+    const messages = event.state.messages;
+    // ...
+  }
+});
+
+// After
+agentUnsubscribe = agent.subscribe((event) => {
+  const updateEvents = ["message_start", "message_end", "turn_start", "turn_end", "agent_start", "agent_end"];
+  if (updateEvents.includes(event.type)) {
+    const messages = agent.state.messages;
+    // ...
+  } else if (event.type === "message_update") {
+    renderApp();
+  }
+});
+```
+
+3. Moved `AgentState` import from web-ui to agent-core package where it's defined.
+
+### Validation Output
+- `npm run check`: PASSED (no errors)
+- Biome lint: clean
+- TypeScript: clean for both main package and example
+
+### Notes
+- Rebuilt `packages/web-ui` to update dist files with new exports
+- Custom elements are registered via side-effect imports to avoid unused import warnings
+- The HTML template references (`<pi-app-layout>`, `<pi-sidebar>`, `<pi-header>`) work correctly with custom element registration
+
+
+## Safe Area Handling for Mobile - Completed
+
+### Task
+Add `env(safe-area-inset-*)` handling for notched devices.
+
+### Files Modified
+
+**packages/web-ui/src/components/AppLayout.ts**
+- Added inline style to root container div with safe area padding:
+  - `padding-top: env(safe-area-inset-top, 0px)`
+  - `padding-left: env(safe-area-inset-left, 0px)`
+  - `padding-right: env(safe-area-inset-right, 0px)`
+- Bottom inset is handled at input area level (not layout container)
+
+**packages/web-ui/example/index.html**
+- Added `viewport-fit=cover` to viewport meta tag
+- This is required for iOS to expose safe area environment variables
+
+### Validation Output
+```
+npm run check: PASSED
+- biome check: Checked 409 files in 223ms. No fixes applied.
+- tsgo --noEmit: clean
+- tsc --noEmit: clean
+```
+
+### Notes
+- Safe area insets only affect devices with notches/dynamic islands (iPhone X+)
+- On devices without notches, `env()` fallback (0px) is used
+- The spec in `layout.md` documents this pattern for `.app-layout`
+
+## Swipe Gesture for Sidebar - Completed
+
+### Task
+Add swipe gesture detection for opening/closing the sidebar on mobile/tablet devices.
+
+### Files Created
+- `packages/web-ui/src/utils/gesture-utils.ts` - Swipe detection utility with:
+  - `SwipeOptions` interface (threshold, edgeWidth, direction, onSwipe, fromEdge)
+  - `SwipeHandler` interface (attach, detach methods)
+  - `createSwipeHandler()` factory function
+
+### Files Modified
+- `packages/web-ui/src/components/AppLayout.ts` - Added swipe handlers:
+  - Import `createSwipeHandler` and `SwipeHandler` type
+  - Added `sidebarOpenSwipeHandler`, `sidebarCloseSwipeHandler`, `sidebarElement` properties
+  - `setupSwipeHandlers()` - Creates and attaches edge swipe handler for opening sidebar
+  - `cleanupSwipeHandlers()` - Detaches all handlers on disconnect
+  - `updated()` lifecycle - Dynamically attaches close swipe handler when sidebar opens
+
+- `packages/web-ui/src/index.ts` - Added exports:
+  - `SwipeHandler` type
+  - `SwipeOptions` type
+  - `createSwipeHandler` function
+
+### Implementation Details
+
+**Swipe Detection Logic:**
+- Uses `touchstart` and `touchend` events (passive listeners)
+- Tracks start position and validates swipe direction
+- Checks horizontal vs vertical dominance to avoid conflicts with scrolling
+- Supports edge-only triggers (left edge for opening sidebar)
+
+**Sidebar Open Gesture:**
+- Attached to AppLayout component
+- Swipe right from left edge (20px zone)
+- Only triggers on mobile/tablet (when `!isDesktop`)
+- Only triggers when sidebar is closed
+
+**Sidebar Close Gesture:**
+- Attached to sidebar container element after it opens
+- Swipe left anywhere on sidebar
+- Dynamically attached/detached based on `sidebarOpen` state
+- Uses class selector `[class*="inset-y-0"][class*="left-0"]` to find sidebar element
+
+### Validation Output
+```
+npm run check: PASSED
+- biome check: Checked 410 files. No fixes applied.
+- tsgo --noEmit: clean
+- tsc --noEmit: clean (main package and example)
+```
+
+### Testing Notes
+- Use Chrome DevTools device emulation with touch simulation
+- Swipe from left edge (first 20px) to open sidebar
+- Swipe left on open sidebar to close
+- Gestures only work on mobile/tablet breakpoints (< 1024px)
+
+
+## Swipe-to-Delete for SessionItem
+
+### Completed
+Added swipe-to-delete functionality to `packages/web-ui/src/components/SessionItem.ts`:
+
+**State & Properties Added:**
+- `swipeOffset` state for tracking swipe position
+- `isSwiping` state for detecting active swipe
+- `onDelete` callback property
+- Touch tracking variables (`touchStartX`, `touchStartY`, `swipeDirectionLocked`)
+
+**Touch Handlers:**
+- `handleTouchStart()` - Records touch position, starts swipe tracking
+- `handleTouchMove()` - Calculates offset, locks direction (horizontal vs vertical), prevents scroll
+- `handleTouchEnd()` - Snaps to open (-80px) or closed (0) based on threshold
+- `handleDeleteClick()` - Triggers delete callback, resets swipe state
+
+**Render Changes:**
+- Wrapped content in swipe container with `overflow-hidden`
+- Added delete button (80px width) behind session content with trash icon
+- Session content slides left using `translateX()` transform
+- Spring-back animation via `transition-transform duration-200 ease-out` (disabled during active swipe)
+
+**i18n Updates:**
+- Added "Delete session" key to interface and both English/German translations
+
+### Validation Output
+- `npm run check`: Passed with no errors
+- No suppressions added
+
+## Task: Optimize Touch Targets
+
+### Summary
+Ensured all interactive elements have minimum 44x44px touch targets (WCAG 2.5.5 / Apple HIG).
+
+### Components Updated
+
+**Sidebar.ts:**
+- Settings button: Added `min-w-11 min-h-11 flex items-center justify-center`
+- Clear search button: Changed `p-1` to `p-2.5`, added `flex items-center justify-center`
+
+**Header.ts:**
+- Menu button (hamburger): Added `min-w-11 min-h-11 flex items-center justify-center`
+- Model badge: Changed `px-2 py-1` to `px-3 min-h-11`, changed `block` to `flex items-center justify-center`
+- New Chat button: Added `min-w-11 min-h-11`, changed `block` to `flex items-center justify-center`
+- Settings button: Added `min-w-11 min-h-11 flex items-center justify-center`
+
+**SessionItem.ts:**
+- Context menu button (⋮): Changed `p-1` to `p-2 min-w-11 min-h-11 -m-1`, added `flex items-center justify-center`
+- Delete button (swipe): Already adequate at 80px wide × full height
+- Main session button: Already adequate with `p-3` and full content width
+
+### Validation Output
+- `npm run check`: Passed with no errors
+- All lint rules clean
+- TypeScript: No errors
+
+## Task: Handle Virtual Keyboard - Completed
+
+### Summary
+Added `visualViewport` API handling to keep the input visible when the virtual keyboard opens on mobile.
+
+### Files Modified
+
+**packages/web-ui/src/components/MessageEditor.ts:**
+- Added `@state() private keyboardOffset = 0` reactive property
+- Added `setupKeyboardHandling()` method - Attaches resize/scroll listeners to `window.visualViewport`
+- Added `teardownKeyboardHandling()` method - Removes listeners on cleanup
+- Added `handleViewportResize()` handler - Calculates keyboard height from `window.innerHeight - visualViewport.height`
+- Added `connectedCallback()` override - Sets up keyboard handling on mount
+- Added `disconnectedCallback()` override - Tears down keyboard handling on unmount
+- Updated `render()` - Applies `margin-bottom: ${keyboardOffset}px` to main container when keyboard is open
+
+### Implementation Details
+
+**How it works:**
+1. When the virtual keyboard opens on mobile (especially iOS with `viewport-fit=cover`):
+   - `window.visualViewport.height` shrinks to the visible area above keyboard
+   - `window.innerHeight` remains the full viewport height
+   - The difference is the keyboard height
+
+2. The component calculates `keyboardHeight = window.innerHeight - visualViewport.height`
+
+3. When `keyboardHeight > 0`, a `margin-bottom` is applied to push the input above the keyboard
+
+**Why margin-bottom vs transform:**
+- `margin-bottom` works better with flex layouts (the parent `shrink-0` container)
+- Doesn't conflict with other transforms that might be applied
+- Naturally integrates with the existing layout flow
+
+**Existing Layout Already Helps:**
+- `AppLayout` uses `h-dvh` (dynamic viewport height) which automatically adjusts on keyboard open/close
+- The flex layout with `shrink-0` on the input area keeps it anchored to the bottom
+- The `visualViewport` API provides additional insurance for edge cases on iOS Safari
+
+### Validation Output
+- `npm run check`: PASSED (no errors)
+- Biome lint: clean
+- TypeScript: clean
+
+## Toast Notification Component - Completed
+
+### Files Created
+
+**packages/web-ui/src/components/Toast.ts:**
+- Lit component with `@customElement("pi-toast")` decorator
+- Light DOM rendering (no shadow DOM)
+- Properties: `message`, `variant` (success/error/info), `visible`, `duration`, `onClose`
+- Auto-dismiss with configurable duration (default 3000ms)
+- Clears timeout on disconnect and manual close
+- Variants with appropriate icons (CheckCircle, AlertCircle, Info from lucide)
+- Variant styles: green (success), red (error), zinc-800 (info)
+- Smooth opacity/translate animation via `transition-all duration-300`
+- ARIA attributes: `role="status"`, `aria-live` (assertive for error, polite for others), `aria-atomic="true"`
+
+**packages/web-ui/src/utils/toast.ts:**
+- `ToastOptions` interface: message, variant?, duration?
+- `showToast(options: ToastOptions | string)` - Simple API accepting string or options object
+- `dismissAllToasts()` - Clears all active toasts
+- Creates container div (`#pi-toast-container`) with fixed bottom positioning
+- Uses `crypto.randomUUID()` for unique toast IDs
+- Handles removal with fade-out animation (300ms delay before DOM removal)
+- Container check ensures container exists and is attached to body
+
+### Files Modified
+
+**packages/web-ui/src/index.ts:**
+- Added exports: `Toast`, `ToastVariant` type
+- Added exports: `ToastOptions` type, `showToast`, `dismissAllToasts`
+
+### Usage
+```typescript
+import { showToast } from '@mariozechner/pi-web-ui';
+
+showToast('Session exported successfully');
+showToast({ message: 'Failed to delete', variant: 'error' });
+showToast({ message: 'Session saved', variant: 'success' });
+showToast({ message: 'Loading...', variant: 'info', duration: 5000 });
+```
+
+### Validation Output
+- `npm run check`: PASSED (no errors, no warnings, no infos)
+
+## Loading Skeletons - Completed
+
+### Task
+Show skeleton loading states while sessions load and while waiting for first token.
+
+### Analysis
+
+**StreamingMessageContainer already handles waiting state:**
+- When `isStreaming=true` but no message has arrived yet, it shows a pulsing cursor:
+  ```typescript
+  if (this.isStreaming)
+    return html`<span class="mx-4 inline-block w-2 h-4 bg-muted-foreground animate-pulse"></span>`;
+  ```
+- No additional changes needed for MessageList
+
+**Sidebar needed skeleton loading state:**
+- Added `loading` property to show skeleton while sessions are being fetched
+
+### Files Modified
+
+**packages/web-ui/src/components/Sidebar.ts:**
+- Added `@property({ type: Boolean }) loading = false` property
+- Added `renderSessionSkeleton()` method:
+  - Renders 4 skeleton session items
+  - Each item has 3 placeholder bars (title, preview line 1, preview line 2)
+  - Uses `animate-pulse` for loading animation
+  - Uses `bg-muted` for placeholder colors
+  - Width varies (w-3/4, w-full, w-1/2) to look natural
+- Updated `renderSessionList()` to check `loading` first and render skeleton
+
+### Skeleton Structure
+```html
+<div class="flex flex-col gap-2 p-2">
+  <!-- 4 skeleton items -->
+  <div class="p-3 rounded-md">
+    <div class="h-4 bg-muted rounded w-3/4 mb-2 animate-pulse"></div>
+    <div class="h-3 bg-muted rounded w-full mb-2 animate-pulse"></div>
+    <div class="h-3 bg-muted rounded w-1/2 animate-pulse"></div>
+  </div>
+</div>
+```
+
+### Validation Output
+- `npm run check`: PASSED (no errors)
+- Biome lint: Checked 412 files, no fixes needed
+- TypeScript: clean
+
+### Usage
+```typescript
+// Set loading=true while fetching sessions
+<pi-sidebar .loading=${true} .sessions=${[]}></pi-sidebar>
+
+// Set loading=false and provide sessions when ready
+<pi-sidebar .loading=${false} .sessions=${sessions}></pi-sidebar>
+```
+
+### Notes
+- MessageList/StreamingMessageContainer already has loading state for waiting on first token
+- Skeleton uses Tailwind's `animate-pulse` which is simpler and already available
+
+## Add Empty States - Completed
+
+### Task
+Show friendly empty states: "No conversations yet" in sidebar (already done), welcome message with suggested prompts in chat.
+
+### Verification of Sidebar Empty State
+Already implemented in `Sidebar.ts` with:
+- Chat bubble icon (SVG)
+- "No conversations yet" text
+- "Start a new chat to begin" subtext
+
+### Files Modified
+
+**packages/web-ui/src/components/MessageList.ts:**
+- Added `SuggestedPrompt` interface with `title`, `description`, `prompt` fields
+- Added `onSuggestedPrompt?: (prompt: string) => void` callback property
+- Added `defaultSuggestions` array with 4 suggested prompts:
+  - Explain a concept / quantum computing
+  - Write code / React component
+  - Brainstorm ideas / project planning
+  - Analyze data / dataset insights
+- Added `renderEmptyState()` method:
+  - Chat bubble icon (16x16, text-primary)
+  - "How can I help you today?" heading
+  - "Ask me anything or try one of these suggestions" subtext
+  - 2x2 grid of clickable suggestion buttons
+  - Each button shows title and description
+  - Click triggers onSuggestedPrompt callback
+- Updated `render()` to check for empty messages and show empty state
+
+**packages/web-ui/src/components/MessageEditor.ts:**
+- Added public `focus()` method to focus the textarea
+
+**packages/web-ui/src/components/AgentInterface.ts:**
+- Added `handleSuggestedPrompt` callback to set input and focus editor
+- Passed `onSuggestedPrompt` handler to `message-list` component
+
+**packages/web-ui/src/utils/i18n.ts:**
+- Added i18n interface keys and translations (EN/DE) for:
+  - "How can I help you today?"
+  - "Ask me anything or try one of these suggestions"
+  - "Explain a concept"
+  - "Help me understand quantum computing"
+  - "Write code"
+  - "Create a React component"
+  - "Brainstorm ideas"
+  - "Help me plan a project"
+  - "Analyze data"
+  - "Help me understand this dataset"
+
+### Validation Output
+- `npm run check`: PASSED (no errors)
+- Biome lint: Checked 412 files, no fixes needed
+- TypeScript: clean
+
+### Behavior
+- When MessageList has no messages, shows welcome screen with suggested prompts
+- Clicking a prompt fills the input and focuses the editor
+- Grid is responsive (1 column on mobile, 2 columns on sm+)
+- All text is i18n-enabled
+
+
+## Keyboard Shortcuts Implementation - Wed Jan 14 06:19:44 PM PST 2026
+
+### Completed
+Implemented global keyboard shortcuts for the web UI.
+
+### Files Created
+- `packages/web-ui/src/utils/keyboard-shortcuts.ts` - Keyboard shortcut manager utility
+
+### Files Modified
+- `packages/web-ui/src/components/AppLayout.ts` - Integrated shortcut manager
+- `packages/web-ui/src/index.ts` - Exported keyboard utilities
+
+### Changes
+
+**keyboard-shortcuts.ts:**
+- Created `KeyboardShortcut` interface with key, modifiers (ctrl/meta/shift/alt), handler, description
+- Created `ShortcutManager` interface with register/unregister/attach/detach methods
+- Created `createShortcutManager()` factory function
+- Platform-aware: treats Cmd (meta) and Ctrl as unified "mod" key
+- Skips input fields except for Escape key
+
+**AppLayout.ts:**
+- Added `onNewChat` and `onSearch` callback properties
+- Added `shortcutManager` private field
+- Added `setupKeyboardShortcuts()` method that registers:
+  - Cmd/Ctrl+B: Toggle sidebar
+  - Cmd/Ctrl+N: New chat
+  - Cmd/Ctrl+K: Search
+  - Escape: Close sidebar (mobile) and artifacts panel
+- Shortcuts attached on connectedCallback, detached on disconnectedCallback
+
+### Validation Output
+```
+npm run check: All checks passed
+- biome check: 0 issues
+- tsgo --noEmit: clean
+- tsc --noEmit: clean
+```
+
+
+
+## ErrorBanner Component - Completed
+
+### Task
+Create an error banner component with clear error states for: rate limit (with retry timer), network error (with retry button), context overflow, auth, and generic errors.
+
+### Files Created
+- `packages/web-ui/src/components/ErrorBanner.ts` - New error banner component
+
+### Files Modified
+- `packages/web-ui/src/index.ts` - Added export for ErrorBanner and ErrorType
+
+### Implementation Details
+
+**Component API:**
+```typescript
+export type ErrorType = 'rate-limit' | 'network' | 'context-overflow' | 'auth' | 'generic';
+
+@customElement('pi-error-banner')
+export class ErrorBanner extends LitElement {
+  @property({ type: String }) type: ErrorType = 'generic';
+  @property({ type: String }) message = '';
+  @property({ type: Number }) retryAfter?: number;
+  @property({ attribute: false }) onRetry?: () => void;
+  @property({ attribute: false }) onDismiss?: () => void;
+  @state() private countdown = 0;
+}
+```
+
+**Error Type Colors:**
+- Rate limit: Amber (warning)
+- Context overflow: Blue (informational)
+- Network/Auth/Generic: Red (error)
+
+**Error Type Behaviors:**
+- Rate limit: Shows countdown timer, auto-retries when countdown reaches 0, optional Cancel button
+- Network: Shows Retry button
+- Context overflow: No action (auto-compacting message)
+- Auth: Shows dismiss X button
+- Generic: Shows dismiss X button with custom message
+
+**Icons (from lucide):**
+- Rate limit: Clock
+- Network: WifiOff
+- Context overflow: Database
+- Auth: Key
+- Generic: AlertCircle
+
+**Countdown Timer:**
+- Uses `willUpdate` lifecycle to start countdown when `retryAfter` property changes
+- Uses `setInterval` with 1-second ticks
+- Clears interval on disconnect and when countdown completes
+- Calls `onRetry` callback when countdown reaches 0
+
+**Accessibility:**
+- Uses `role="alert"` for screen reader announcement
+- Uses `aria-live="assertive"` for network/auth errors, `polite` for others
+- Dismiss buttons have `aria-label="Dismiss"`
+
+### Validation Output
+- `npm run check`: PASSED (no errors)
+- Biome lint: Checked 414 files, fixed 1 file (auto-formatted)
+- TypeScript: clean
+
+### Usage
+```typescript
+// Rate limit with countdown
+<pi-error-banner
+  type="rate-limit"
+  .retryAfter=${60}
+  .onRetry=${() => retry()}
+  .onDismiss=${() => cancel()}
+></pi-error-banner>
+
+// Network error with retry
+<pi-error-banner
+  type="network"
+  .onRetry=${() => reconnect()}
+></pi-error-banner>
+
+// Context overflow (auto-compacting)
+<pi-error-banner type="context-overflow"></pi-error-banner>
+
+// Generic error
+<pi-error-banner
+  type="generic"
+  message="Failed to load session"
+  .onDismiss=${() => dismiss()}
+></pi-error-banner>
+```
+
+
+## Settings Preferences Tab - Completed
+
+### Task
+Add a preferences tab to settings: default model, default thinking level, theme preference, sidebar collapsed by default.
+
+### Files Modified
+
+**packages/web-ui/src/storage/stores/settings-store.ts:**
+- Added `ThemePreference` type export (`"light" | "dark" | "system"`)
+- Added import for `ThinkingLevel` from `@mariozechner/pi-agent-core`
+- Added preference helper methods:
+  - `getDefaultModel()` / `setDefaultModel(modelId: string | null)`
+  - `getDefaultThinkingLevel()` / `setDefaultThinkingLevel(level: ThinkingLevel)`
+  - `getThemePreference()` / `setThemePreference(theme: ThemePreference)`
+  - `getSidebarCollapsed()` / `setSidebarCollapsed(collapsed: boolean)`
+- `setThemePreference` also updates `localStorage.theme` for mini-lit ThemeToggle compatibility and applies theme via `applyTheme()` private method
+
+**packages/web-ui/src/dialogs/SettingsDialog.ts:**
+- Added imports: `Button`, `Select`, `ThinkingLevel`, `getModels`, `Model`, `ThemePreference`
+- Added `PreferencesTab` class (`@customElement("preferences-tab")`) with:
+  - State: `defaultModel`, `defaultThinkingLevel`, `themePreference`, `sidebarCollapsed`, `allModels`
+  - `connectedCallback` loads preferences and models from all providers
+  - Save methods for each preference that update UI state and persist to storage
+  - Render method with:
+    - Default Model: Select dropdown with "Use last selected" + all available models
+    - Default Thinking Level: Select dropdown with Off/Minimal/Low/Medium/High/Extra High
+    - Theme: Three buttons (Light/Dark/System) with active state styling
+    - Sidebar Collapsed: Switch toggle
+
+**packages/web-ui/src/utils/i18n.ts:**
+- Added i18n interface keys and translations (EN/DE) for:
+  - "Preferences" / "Einstellungen"
+  - "Extra High" / "Sehr Hoch"
+  - "Use last selected" / "Zuletzt ausgewählt verwenden"
+  - "Default Model" / "Standardmodell"
+  - "Model used when starting a new chat" / "Modell, das beim Starten eines neuen Chats verwendet wird"
+  - "Default Thinking Level" / "Standard-Denkniveau"
+  - "Extended thinking level for reasoning models" / "Erweitertes Denkniveau für Reasoning-Modelle"
+  - "Theme" / "Design"
+  - "Light" / "Hell"
+  - "Dark" / "Dunkel"
+  - "System" / "System"
+  - "Choose your preferred color scheme" / "Wählen Sie Ihr bevorzugtes Farbschema"
+  - "Start with sidebar closed" / "Mit geschlossener Seitenleiste starten"
+  - "On desktop, collapse the sidebar by default" / "Auf dem Desktop die Seitenleiste standardmäßig einklappen"
+
+**packages/web-ui/src/index.ts:**
+- Added export for `PreferencesTab` from `./dialogs/SettingsDialog.js`
+- Added export for `ThemePreference` type from `./storage/stores/settings-store.js`
+
+### Validation Output
+- `npm run check`: PASSED (no errors)
+- Biome lint: Checked 414 files, no fixes needed
+- TypeScript: clean (main package and example)
+
+### Usage
+```typescript
+import { SettingsDialog, PreferencesTab, ApiKeysTab, ProxyTab } from '@mariozechner/pi-web-ui';
+
+// Open settings with preferences tab
+SettingsDialog.open([
+  new PreferencesTab(),
+  new ApiKeysTab(),
+  new ProxyTab(),
+]);
+```
+
+### Persistence Keys
+Settings are stored in IndexedDB via SettingsStore with keys:
+- `preferences.defaultModel` - string (model ID)
+- `preferences.defaultThinkingLevel` - ThinkingLevel
+- `preferences.theme` - ThemePreference
+- `preferences.sidebarCollapsed` - boolean
+
+## Final Polish and Cleanup - Completed
+
+### Issues Found and Fixed
+
+**Accessibility Improvements:**
+1. `Toast.ts` - Added i18n import and wrapped "Dismiss" aria-label with i18n()
+2. `ErrorBanner.ts` - Added i18n import and wrapped all UI strings:
+   - Error titles (Rate limit reached, Connection lost, etc.)
+   - Subtitles (Ready to retry, Unable to reach server, etc.)
+   - Button labels (Cancel, Retry, Dismiss)
+3. `SessionItem.ts` - Removed incorrect `role="option"` (was not inside listbox), added descriptive aria-label
+
+**i18n Additions:**
+Added the following translation keys to both interface and English/German translations:
+- Rate limit reached / Rate-Limit erreicht
+- Connection lost / Verbindung verloren
+- Context limit reached / Kontextlimit erreicht
+- Authentication failed / Authentifizierung fehlgeschlagen
+- Something went wrong / Etwas ist schiefgelaufen
+- Retrying in / Erneuter Versuch in
+- Ready to retry / Bereit zum erneuten Versuch
+- Unable to reach the server / Server nicht erreichbar
+- Compacting conversation to continue... / Komprimiere Konversation um fortzufahren...
+- Please check your API key / Bitte überprüfen Sie Ihren API-Schlüssel
+- An unexpected error occurred / Ein unerwarteter Fehler ist aufgetreten
+- Dismiss / Schließen
+- Retry / Wiederholen
+
+### Animation Performance Review
+All animations use GPU-accelerated properties:
+- `AppLayout.ts`: Uses `transform: translateX()` with `transition-transform`
+- `SessionItem.ts`: Uses `transform: translateX()` for swipe-to-delete
+- `Toast.ts`: Uses `transform` and `opacity` with `transition-all`
+- Sidebar and artifacts panels: Use `transform` for slide animations
+
+### Code Quality
+- No `any` types found in new code
+- All event listeners properly cleaned up in disconnectedCallback
+- No console.log statements in new components (existing ones in test-sessions.ts are intentional test data)
+
+### Verification
+- `npm run check` passes with no errors
+- No TODOs in new code
+- All components have proper accessibility attributes

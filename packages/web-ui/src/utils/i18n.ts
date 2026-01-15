@@ -166,6 +166,9 @@ declare module "@mariozechner/mini-lit" {
 		"Delete this session?": string;
 		Today: string;
 		Yesterday: string;
+		"Last 7 Days": string;
+		"Last 30 Days": string;
+		Older: string;
 		"{days} days ago": string;
 		messages: string;
 		tokens: string;
@@ -204,6 +207,69 @@ declare module "@mariozechner/mini-lit" {
 		"Anthropic Messages Compatible": string;
 		"Checking...": string;
 		Disconnected: string;
+		// Sidebar strings
+		"New Chat": string;
+		"Search conversations": string;
+		"No messages yet": string;
+		"No conversations yet": string;
+		"Start a new chat to begin": string;
+		// SessionItem strings
+		message: string;
+		"Session menu": string;
+		"Delete session": string;
+		// Search strings
+		"Clear search": string;
+		"No results found": string;
+		"Try a different search term": string;
+		// Context menu strings
+		Rename: string;
+		Export: string;
+		"Delete conversation?": string;
+		"This action cannot be undone.": string;
+		// Header strings
+		"Open menu": string;
+		"Responding...": string;
+		"Click to edit title": string;
+		// Error banner strings
+		"Rate limit reached": string;
+		"Connection lost": string;
+		"Context limit reached": string;
+		"Authentication failed": string;
+		"Something went wrong": string;
+		"Retrying in": string;
+		"Ready to retry": string;
+		"Unable to reach the server": string;
+		"Compacting conversation to continue...": string;
+		"Please check your API key": string;
+		"An unexpected error occurred": string;
+		Dismiss: string;
+		Retry: string;
+		// Empty state / welcome strings
+		"How can I help you today?": string;
+		"Ask me anything or try one of these suggestions": string;
+		"Explain a concept": string;
+		"Help me understand quantum computing": string;
+		"Write code": string;
+		"Create a React component": string;
+		"Brainstorm ideas": string;
+		"Help me plan a project": string;
+		"Analyze data": string;
+		"Help me understand this dataset": string;
+		// Preferences strings
+		Preferences: string;
+		"Extra High": string;
+		"Use last selected": string;
+		"Default Model": string;
+		"Model used when starting a new chat": string;
+		"Default Thinking Level": string;
+		"Extended thinking level for reasoning models": string;
+		Theme: string;
+		Light: string;
+		Dark: string;
+		System: string;
+		"Choose your preferred color scheme": string;
+		"Start with sidebar closed": string;
+		"On desktop, collapse the sidebar by default": string;
 	}
 }
 
@@ -382,6 +448,9 @@ export const translations = {
 		"Delete this session?": "Delete this session?",
 		Today: "Today",
 		Yesterday: "Yesterday",
+		"Last 7 Days": "Last 7 Days",
+		"Last 30 Days": "Last 30 Days",
+		Older: "Older",
 		"{days} days ago": "{days} days ago",
 		messages: "messages",
 		tokens: "tokens",
@@ -426,6 +495,69 @@ export const translations = {
 		"Anthropic Messages Compatible": "Anthropic Messages Compatible",
 		"Checking...": "Checking...",
 		Disconnected: "Disconnected",
+		// Sidebar strings
+		"New Chat": "New Chat",
+		"Search conversations": "Search conversations",
+		"No messages yet": "No messages yet",
+		"No conversations yet": "No conversations yet",
+		"Start a new chat to begin": "Start a new chat to begin",
+		// SessionItem strings
+		message: "message",
+		"Session menu": "Session menu",
+		"Delete session": "Delete session",
+		// Search strings
+		"Clear search": "Clear search",
+		"No results found": "No results found",
+		"Try a different search term": "Try a different search term",
+		// Context menu strings
+		Rename: "Rename",
+		Export: "Export",
+		"Delete conversation?": "Delete conversation?",
+		"This action cannot be undone.": "This action cannot be undone.",
+		// Header strings
+		"Open menu": "Open menu",
+		"Responding...": "Responding...",
+		"Click to edit title": "Click to edit title",
+		// Error banner strings
+		"Rate limit reached": "Rate limit reached",
+		"Connection lost": "Connection lost",
+		"Context limit reached": "Context limit reached",
+		"Authentication failed": "Authentication failed",
+		"Something went wrong": "Something went wrong",
+		"Retrying in": "Retrying in",
+		"Ready to retry": "Ready to retry",
+		"Unable to reach the server": "Unable to reach the server",
+		"Compacting conversation to continue...": "Compacting conversation to continue...",
+		"Please check your API key": "Please check your API key",
+		"An unexpected error occurred": "An unexpected error occurred",
+		Dismiss: "Dismiss",
+		Retry: "Retry",
+		// Empty state / welcome strings
+		"How can I help you today?": "How can I help you today?",
+		"Ask me anything or try one of these suggestions": "Ask me anything or try one of these suggestions",
+		"Explain a concept": "Explain a concept",
+		"Help me understand quantum computing": "Help me understand quantum computing",
+		"Write code": "Write code",
+		"Create a React component": "Create a React component",
+		"Brainstorm ideas": "Brainstorm ideas",
+		"Help me plan a project": "Help me plan a project",
+		"Analyze data": "Analyze data",
+		"Help me understand this dataset": "Help me understand this dataset",
+		// Preferences strings
+		Preferences: "Preferences",
+		"Extra High": "Extra High",
+		"Use last selected": "Use last selected",
+		"Default Model": "Default Model",
+		"Model used when starting a new chat": "Model used when starting a new chat",
+		"Default Thinking Level": "Default Thinking Level",
+		"Extended thinking level for reasoning models": "Extended thinking level for reasoning models",
+		Theme: "Theme",
+		Light: "Light",
+		Dark: "Dark",
+		System: "System",
+		"Choose your preferred color scheme": "Choose your preferred color scheme",
+		"Start with sidebar closed": "Start with sidebar closed",
+		"On desktop, collapse the sidebar by default": "On desktop, collapse the sidebar by default",
 	},
 	de: {
 		...defaultGerman,
@@ -601,6 +733,9 @@ export const translations = {
 		"Delete this session?": "Diese Sitzung löschen?",
 		Today: "Heute",
 		Yesterday: "Gestern",
+		"Last 7 Days": "Letzte 7 Tage",
+		"Last 30 Days": "Letzte 30 Tage",
+		Older: "Älter",
 		"{days} days ago": "vor {days} Tagen",
 		messages: "Nachrichten",
 		tokens: "Tokens",
@@ -645,6 +780,70 @@ export const translations = {
 		"Anthropic Messages Compatible": "Anthropic Messages Kompatibel",
 		"Checking...": "Überprüfe...",
 		Disconnected: "Getrennt",
+		// Sidebar strings
+		"New Chat": "Neuer Chat",
+		"Search conversations": "Konversationen suchen",
+		"No messages yet": "Noch keine Nachrichten",
+		"No conversations yet": "Noch keine Konversationen",
+		"Start a new chat to begin": "Starten Sie einen neuen Chat",
+		// SessionItem strings
+		message: "Nachricht",
+		"Session menu": "Sitzungsmenü",
+		"Delete session": "Sitzung löschen",
+		// Search strings
+		"Clear search": "Suche löschen",
+		"No results found": "Keine Ergebnisse gefunden",
+		"Try a different search term": "Versuchen Sie einen anderen Suchbegriff",
+		// Context menu strings
+		Rename: "Umbenennen",
+		Export: "Exportieren",
+		"Delete conversation?": "Konversation löschen?",
+		"This action cannot be undone.": "Diese Aktion kann nicht rückgängig gemacht werden.",
+		// Header strings
+		"Open menu": "Menü öffnen",
+		"Responding...": "Antwortet...",
+		"Click to edit title": "Klicken zum Bearbeiten des Titels",
+		// Error banner strings
+		"Rate limit reached": "Rate-Limit erreicht",
+		"Connection lost": "Verbindung verloren",
+		"Context limit reached": "Kontextlimit erreicht",
+		"Authentication failed": "Authentifizierung fehlgeschlagen",
+		"Something went wrong": "Etwas ist schiefgelaufen",
+		"Retrying in": "Erneuter Versuch in",
+		"Ready to retry": "Bereit zum erneuten Versuch",
+		"Unable to reach the server": "Server nicht erreichbar",
+		"Compacting conversation to continue...": "Komprimiere Konversation um fortzufahren...",
+		"Please check your API key": "Bitte überprüfen Sie Ihren API-Schlüssel",
+		"An unexpected error occurred": "Ein unerwarteter Fehler ist aufgetreten",
+		Dismiss: "Schließen",
+		Retry: "Wiederholen",
+		// Empty state / welcome strings
+		"How can I help you today?": "Wie kann ich Ihnen heute helfen?",
+		"Ask me anything or try one of these suggestions":
+			"Fragen Sie mich alles oder probieren Sie einen dieser Vorschläge",
+		"Explain a concept": "Ein Konzept erklären",
+		"Help me understand quantum computing": "Hilf mir, Quantencomputing zu verstehen",
+		"Write code": "Code schreiben",
+		"Create a React component": "Eine React-Komponente erstellen",
+		"Brainstorm ideas": "Ideen sammeln",
+		"Help me plan a project": "Hilf mir bei der Projektplanung",
+		"Analyze data": "Daten analysieren",
+		"Help me understand this dataset": "Hilf mir, diesen Datensatz zu verstehen",
+		// Preferences strings
+		Preferences: "Einstellungen",
+		"Extra High": "Sehr Hoch",
+		"Use last selected": "Zuletzt ausgewählt verwenden",
+		"Default Model": "Standardmodell",
+		"Model used when starting a new chat": "Modell, das beim Starten eines neuen Chats verwendet wird",
+		"Default Thinking Level": "Standard-Denkniveau",
+		"Extended thinking level for reasoning models": "Erweitertes Denkniveau für Reasoning-Modelle",
+		Theme: "Design",
+		Light: "Hell",
+		Dark: "Dunkel",
+		System: "System",
+		"Choose your preferred color scheme": "Wählen Sie Ihr bevorzugtes Farbschema",
+		"Start with sidebar closed": "Mit geschlossener Seitenleiste starten",
+		"On desktop, collapse the sidebar by default": "Auf dem Desktop die Seitenleiste standardmäßig einklappen",
 	},
 };
 

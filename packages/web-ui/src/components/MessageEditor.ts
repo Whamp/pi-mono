@@ -47,11 +47,37 @@ export class MessageEditor extends LitElement {
 
 	@state() processingFiles = false;
 	@state() isDragging = false;
+	@state() private keyboardOffset = 0;
 	private fileInputRef = createRef<HTMLInputElement>();
 
 	protected override createRenderRoot(): HTMLElement | DocumentFragment {
 		return this;
 	}
+
+	private setupKeyboardHandling() {
+		if (typeof window !== "undefined" && window.visualViewport) {
+			window.visualViewport.addEventListener("resize", this.handleViewportResize);
+			window.visualViewport.addEventListener("scroll", this.handleViewportResize);
+		}
+	}
+
+	private teardownKeyboardHandling() {
+		if (typeof window !== "undefined" && window.visualViewport) {
+			window.visualViewport.removeEventListener("resize", this.handleViewportResize);
+			window.visualViewport.removeEventListener("scroll", this.handleViewportResize);
+		}
+	}
+
+	private handleViewportResize = () => {
+		if (!window.visualViewport) return;
+
+		// Calculate the keyboard height
+		// visualViewport.height is the visible area, window.innerHeight is full viewport
+		const keyboardHeight = window.innerHeight - window.visualViewport.height;
+
+		// Set offset to push content above keyboard
+		this.keyboardOffset = keyboardHeight > 0 ? keyboardHeight : 0;
+	};
 
 	private handleTextareaInput = (e: Event) => {
 		const textarea = e.target as HTMLTextAreaElement;
@@ -225,7 +251,24 @@ export class MessageEditor extends LitElement {
 		this.processingFiles = false;
 	};
 
+	override connectedCallback() {
+		super.connectedCallback();
+		this.setupKeyboardHandling();
+	}
+
+	override disconnectedCallback() {
+		super.disconnectedCallback();
+		this.teardownKeyboardHandling();
+	}
+
 	override firstUpdated() {
+		const textarea = this.textareaRef.value;
+		if (textarea) {
+			textarea.focus();
+		}
+	}
+
+	public focus() {
 		const textarea = this.textareaRef.value;
 		if (textarea) {
 			textarea.focus();
@@ -237,9 +280,13 @@ export class MessageEditor extends LitElement {
 		const model = this.currentModel;
 		const supportsThinking = model?.reasoning === true; // Models with reasoning:true support thinking
 
+		// Apply keyboard offset to keep input visible when virtual keyboard opens on mobile
+		const keyboardStyle = this.keyboardOffset > 0 ? `margin-bottom: ${this.keyboardOffset}px` : "";
+
 		return html`
 			<div
 				class="bg-card rounded-xl border shadow-sm relative ${this.isDragging ? "border-primary border-2 bg-primary/5" : "border-border"}"
+				style=${keyboardStyle}
 				@dragover=${this.handleDragOver}
 				@dragleave=${this.handleDragLeave}
 				@drop=${this.handleDrop}

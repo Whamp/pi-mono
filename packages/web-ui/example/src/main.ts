@@ -1,30 +1,33 @@
 import "@mariozechner/mini-lit/dist/ThemeToggle.js";
-import { Agent, type AgentMessage } from "@mariozechner/pi-agent-core";
+import { Agent, type AgentMessage, type AgentState } from "@mariozechner/pi-agent-core";
 import { getModel } from "@mariozechner/pi-ai";
 import {
-	type AgentState,
 	ApiKeyPromptDialog,
 	AppStorage,
 	ChatPanel,
 	CustomProvidersStore,
 	createJavaScriptReplTool,
+	exportSessionAsJson,
 	IndexedDBStorageBackend,
 	// PersistentStorageDialog, // TODO: Fix - currently broken
 	ProviderKeysStore,
 	ProvidersModelsTab,
 	ProxyTab,
-	SessionListDialog,
 	SessionsStore,
 	SettingsDialog,
 	SettingsStore,
+	type SidebarSessionMetadata,
 	setAppStorage,
 } from "@mariozechner/pi-web-ui";
+// Side-effect imports: these register custom elements
+import "@mariozechner/pi-web-ui/dist/components/AppLayout.js";
+import "@mariozechner/pi-web-ui/dist/components/Header.js";
+import "@mariozechner/pi-web-ui/dist/components/Sidebar.js";
 import { html, render } from "lit";
-import { Bell, History, Plus, Settings } from "lucide";
+import { Bell } from "lucide";
 import "./app.css";
 import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
-import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { createSystemNotification, customConvertToLlm, registerCustomMessageRenderers } from "./custom-messages.js";
 
 // Register custom message renderers
@@ -64,10 +67,13 @@ setAppStorage(storage);
 
 let currentSessionId: string | undefined;
 let currentTitle = "";
-let isEditingTitle = false;
 let agent: Agent;
 let chatPanel: ChatPanel;
 let agentUnsubscribe: (() => void) | undefined;
+
+// New state for layout
+let sidebarOpen = false;
+let sessionsList: SidebarSessionMetadata[] = [];
 
 const generateTitle = (messages: AgentMessage[]): string => {
 	const firstUserMsg = messages.find((m) => m.role === "user" || m.role === "user-with-attachments");
@@ -79,8 +85,8 @@ const generateTitle = (messages: AgentMessage[]): string => {
 	if (typeof content === "string") {
 		text = content;
 	} else {
-		const textBlocks = content.filter((c: any) => c.type === "text");
-		text = textBlocks.map((c: any) => c.text || "").join(" ");
+		const textBlocks = content.filter((c: unknown) => (c as { type?: string }).type === "text");
+		text = textBlocks.map((c: unknown) => (c as { text?: string }).text || "").join(" ");
 	}
 
 	text = text.trim();
@@ -94,9 +100,29 @@ const generateTitle = (messages: AgentMessage[]): string => {
 };
 
 const shouldSaveSession = (messages: AgentMessage[]): boolean => {
-	const hasUserMsg = messages.some((m: any) => m.role === "user" || m.role === "user-with-attachments");
-	const hasAssistantMsg = messages.some((m: any) => m.role === "assistant");
+	const hasUserMsg = messages.some((m) => m.role === "user" || m.role === "user-with-attachments");
+	const hasAssistantMsg = messages.some((m) => m.role === "assistant");
 	return hasUserMsg && hasAssistantMsg;
+};
+
+const loadSessionsList = async () => {
+	if (!storage.sessions) return;
+	const allMetadata = await storage.sessions.getAllMetadata();
+	// Convert to sidebar format
+	sessionsList = allMetadata.map((meta) => ({
+		id: meta.id,
+		title: meta.title || "Untitled",
+		preview: meta.preview || "",
+		lastModified: meta.lastModified,
+		messageCount: meta.messageCount || 0,
+		usage: meta.usage
+			? {
+					totalInputTokens: meta.usage.input || 0,
+					totalOutputTokens: meta.usage.output || 0,
+					totalCost: meta.usage.cost?.total || 0,
+				}
+			: undefined,
+	}));
 };
 
 const saveSession = async () => {
@@ -144,6 +170,9 @@ const saveSession = async () => {
 		};
 
 		await storage.sessions.save(sessionData, metadata);
+
+		// Refresh sidebar list
+		await loadSessionsList();
 	} catch (err) {
 		console.error("Failed to save session:", err);
 	}
@@ -178,9 +207,11 @@ Feel free to use these tools when needed to provide accurate and helpful respons
 		convertToLlm: customConvertToLlm,
 	});
 
-	agentUnsubscribe = agent.subscribe((event: any) => {
-		if (event.type === "state-update") {
-			const messages = event.state.messages;
+	agentUnsubscribe = agent.subscribe((event) => {
+		// React to message and turn events for UI updates and session saving
+		const updateEvents = ["message_start", "message_end", "turn_start", "turn_end", "agent_start", "agent_end"];
+		if (updateEvents.includes(event.type)) {
+			const messages = agent.state.messages;
 
 			// Generate title after first successful response
 			if (!currentTitle && shouldSaveSession(messages)) {
@@ -198,6 +229,9 @@ Feel free to use these tools when needed to provide accurate and helpful respons
 				saveSession();
 			}
 
+			renderApp();
+		} else if (event.type === "message_update") {
+			// Handle streaming updates - just re-render
 			renderApp();
 		}
 	});
@@ -253,91 +287,94 @@ const renderApp = () => {
 	const app = document.getElementById("app");
 	if (!app) return;
 
-	const appHtml = html`
-		<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden">
-			<!-- Header -->
-			<div class="flex items-center justify-between border-b border-border shrink-0">
-				<div class="flex items-center gap-2 px-4 py-">
-					${Button({
-						variant: "ghost",
-						size: "sm",
-						children: icon(History, "sm"),
-						onClick: () => {
-							SessionListDialog.open(
-								async (sessionId) => {
-									await loadSession(sessionId);
-								},
-								(deletedSessionId) => {
-									// Only reload if the current session was deleted
-									if (deletedSessionId === currentSessionId) {
-										newSession();
-									}
-								},
-							);
-						},
-						title: "Sessions",
-					})}
-					${Button({
-						variant: "ghost",
-						size: "sm",
-						children: icon(Plus, "sm"),
-						onClick: newSession,
-						title: "New Session",
-					})}
+	const isMobile = window.innerWidth < 1024;
 
-					${
-						currentTitle
-							? isEditingTitle
-								? html`<div class="flex items-center gap-2">
-									${Input({
-										type: "text",
-										value: currentTitle,
-										className: "text-sm w-64",
-										onChange: async (e: Event) => {
-											const newTitle = (e.target as HTMLInputElement).value.trim();
-											if (newTitle && newTitle !== currentTitle && storage.sessions && currentSessionId) {
-												await storage.sessions.updateTitle(currentSessionId, newTitle);
-												currentTitle = newTitle;
-											}
-											isEditingTitle = false;
-											renderApp();
-										},
-										onKeyDown: async (e: KeyboardEvent) => {
-											if (e.key === "Enter") {
-												const newTitle = (e.target as HTMLInputElement).value.trim();
-												if (newTitle && newTitle !== currentTitle && storage.sessions && currentSessionId) {
-													await storage.sessions.updateTitle(currentSessionId, newTitle);
-													currentTitle = newTitle;
-												}
-												isEditingTitle = false;
-												renderApp();
-											} else if (e.key === "Escape") {
-												isEditingTitle = false;
-												renderApp();
-											}
-										},
-									})}
-								</div>`
-								: html`<button
-									class="px-2 py-1 text-sm text-foreground hover:bg-secondary rounded transition-colors"
-									@click=${() => {
-										isEditingTitle = true;
-										renderApp();
-										requestAnimationFrame(() => {
-											const input = app?.querySelector('input[type="text"]') as HTMLInputElement;
-											if (input) {
-												input.focus();
-												input.select();
-											}
-										});
-									}}
-									title="Click to edit title"
-								>
-									${currentTitle}
-								</button>`
-							: html`<span class="text-base font-semibold text-foreground">Pi Web UI Example</span>`
+	const appHtml = html`
+		<pi-app-layout
+			?sidebarOpen=${sidebarOpen}
+			.onSidebarToggle=${() => {
+				sidebarOpen = !sidebarOpen;
+				renderApp();
+			}}
+		>
+			<!-- Sidebar -->
+			<pi-sidebar
+				slot="sidebar"
+				.sessions=${sessionsList}
+				.activeSessionId=${currentSessionId || null}
+				.onSelect=${async (sessionId: string) => {
+					await loadSession(sessionId);
+					if (isMobile) sidebarOpen = false;
+					renderApp();
+				}}
+				.onNewChat=${() => {
+					newSession();
+				}}
+				.onDelete=${async (sessionId: string) => {
+					if (storage.sessions) {
+						await storage.sessions.delete(sessionId);
+						await loadSessionsList();
+						if (sessionId === currentSessionId) {
+							newSession();
+						} else {
+							renderApp();
+						}
 					}
-				</div>
+				}}
+				.onRename=${async (sessionId: string, newTitle: string) => {
+					if (storage.sessions) {
+						await storage.sessions.updateTitle(sessionId, newTitle);
+						if (sessionId === currentSessionId) {
+							currentTitle = newTitle;
+						}
+						await loadSessionsList();
+						renderApp();
+					}
+				}}
+				.onExport=${async (sessionId: string) => {
+					if (storage.sessions) {
+						const sessionData = await storage.sessions.get(sessionId);
+						if (sessionData) {
+							exportSessionAsJson({
+								id: sessionData.id,
+								title: sessionData.title,
+								messages: sessionData.messages,
+								metadata: {
+									createdAt: sessionData.createdAt,
+									lastModified: sessionData.lastModified,
+									model: sessionData.model?.id,
+								},
+							});
+						}
+					}
+				}}
+			></pi-sidebar>
+
+			<!-- Header wrapper with pi-header and extra controls -->
+			<div slot="header" class="flex items-center border-b border-border bg-background">
+				<pi-header
+					class="flex-1 border-b-0"
+					.title=${currentTitle || "New Chat"}
+					?showMenuButton=${isMobile}
+					.modelName=${agent?.state.model?.name || ""}
+					.thinkingLevel=${agent?.state.thinkingLevel || "off"}
+					?isStreaming=${agent?.state.isStreaming || false}
+					.onMenuClick=${() => {
+						sidebarOpen = !sidebarOpen;
+						renderApp();
+					}}
+					.onTitleEdit=${async (newTitle: string) => {
+						if (currentSessionId && storage.sessions) {
+							await storage.sessions.updateTitle(currentSessionId, newTitle);
+							currentTitle = newTitle;
+							await loadSessionsList();
+							renderApp();
+						}
+					}}
+					.onSettingsClick=${() => SettingsDialog.open([new ProvidersModelsTab(), new ProxyTab()])}
+					.onNewChatClick=${() => newSession()}
+				></pi-header>
+				<!-- Extra controls (theme toggle and demo button) -->
 				<div class="flex items-center gap-1 px-2">
 					${Button({
 						variant: "ghost",
@@ -356,23 +393,21 @@ const renderApp = () => {
 						title: "Demo: Add Custom Notification",
 					})}
 					<theme-toggle></theme-toggle>
-					${Button({
-						variant: "ghost",
-						size: "sm",
-						children: icon(Settings, "sm"),
-						onClick: () => SettingsDialog.open([new ProvidersModelsTab(), new ProxyTab()]),
-						title: "Settings",
-					})}
 				</div>
 			</div>
 
-			<!-- Chat Panel -->
+			<!-- Main content (default slot) -->
 			${chatPanel}
-		</div>
+		</pi-app-layout>
 	`;
 
 	render(appHtml, app);
 };
+
+// Handle resize for responsive layout
+window.addEventListener("resize", () => {
+	renderApp();
+});
 
 // ============================================================================
 // INIT
@@ -399,6 +434,9 @@ async function initApp() {
 
 	// Create ChatPanel
 	chatPanel = new ChatPanel();
+
+	// Load sessions list for sidebar
+	await loadSessionsList();
 
 	// Check for session in URL
 	const urlParams = new URLSearchParams(window.location.search);

@@ -6,7 +6,14 @@ import type {
 import { html, LitElement, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
+import { i18n } from "../utils/i18n.js";
 import { renderMessage } from "./message-renderer-registry.js";
+
+export interface SuggestedPrompt {
+	title: string;
+	description: string;
+	prompt: string;
+}
 
 export class MessageList extends LitElement {
 	@property({ type: Array }) messages: AgentMessage[] = [];
@@ -14,6 +21,7 @@ export class MessageList extends LitElement {
 	@property({ type: Object }) pendingToolCalls?: Set<string>;
 	@property({ type: Boolean }) isStreaming: boolean = false;
 	@property({ attribute: false }) onCostClick?: () => void;
+	@property({ attribute: false }) onSuggestedPrompt?: (prompt: string) => void;
 
 	protected override createRenderRoot(): HTMLElement | DocumentFragment {
 		return this;
@@ -22,6 +30,68 @@ export class MessageList extends LitElement {
 	override connectedCallback(): void {
 		super.connectedCallback();
 		this.style.display = "block";
+	}
+
+	private readonly defaultSuggestions: SuggestedPrompt[] = [
+		{
+			title: i18n("Explain a concept"),
+			description: i18n("Help me understand quantum computing"),
+			prompt: "Explain quantum computing in simple terms",
+		},
+		{
+			title: i18n("Write code"),
+			description: i18n("Create a React component"),
+			prompt: "Create a React component for a todo list",
+		},
+		{
+			title: i18n("Brainstorm ideas"),
+			description: i18n("Help me plan a project"),
+			prompt: "Help me brainstorm ideas for a mobile app",
+		},
+		{
+			title: i18n("Analyze data"),
+			description: i18n("Help me understand this dataset"),
+			prompt: "What insights can you provide about this data?",
+		},
+	];
+
+	private renderEmptyState() {
+		return html`
+			<div class="flex flex-col items-center justify-center h-full p-8 text-center">
+				<!-- Logo/icon -->
+				<div class="w-16 h-16 mb-6 text-primary">
+					<svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="1.5"
+							d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+						/>
+					</svg>
+				</div>
+
+				<!-- Welcome text -->
+				<h2 class="text-xl font-semibold mb-2">${i18n("How can I help you today?")}</h2>
+				<p class="text-muted-foreground text-sm mb-8">
+					${i18n("Ask me anything or try one of these suggestions")}
+				</p>
+
+				<!-- Suggested prompts grid -->
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg w-full">
+					${this.defaultSuggestions.map(
+						(suggestion) => html`
+							<button
+								@click=${() => this.onSuggestedPrompt?.(suggestion.prompt)}
+								class="p-4 text-left rounded-lg border border-border hover:bg-accent transition-colors"
+							>
+								<div class="font-medium text-sm mb-1">${suggestion.title}</div>
+								<div class="text-xs text-muted-foreground">${suggestion.description}</div>
+							</button>
+						`,
+					)}
+				</div>
+			</div>
+		`;
 	}
 
 	private buildRenderItems() {
@@ -80,6 +150,11 @@ export class MessageList extends LitElement {
 	}
 
 	override render() {
+		// Show empty state when no messages
+		if (!this.messages || this.messages.length === 0) {
+			return this.renderEmptyState();
+		}
+
 		const items = this.buildRenderItems();
 		return html`<div class="flex flex-col gap-3">
 			${repeat(
