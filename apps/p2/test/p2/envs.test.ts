@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { type ChildProcess, execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, symlink, writeFile } from "node:fs/promises";
 import { createServer, Socket } from "node:net";
 import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
@@ -295,6 +295,15 @@ test(
 		assert.equal((await stat(uploadedKey.identityFile)).mode & 0o777, 0o600);
 		await envs.delete({ name: "copy" }, BACKGROUND_CONTEXT);
 		assert(!envs.envs.value.some((entry) => entry.name === "copy"), "the deleted environment is gone at the answer");
+		// settings.json's `skillDirs`: `~` is the remote home; each entry there is a link to a skill folder.
+		await mkdir(join(home, "fleet", "linked"), { recursive: true });
+		await writeFile(
+			join(home, "fleet", "linked", "SKILL.md"),
+			"---\nname: linked\ndescription: Linked remote skill sentinel.\n---\n",
+		);
+		await mkdir(join(home, ".agents", "skills"), { recursive: true });
+		await symlink(join(home, "fleet", "linked"), join(home, ".agents", "skills", "linked"));
+		await writeFile(join(fixture.dataDir, "settings.json"), JSON.stringify({ skillDirs: ["~/.agents/skills"] }));
 		const sessions = await holdIn(owner, Sessions, {}, "owner");
 		const session = await sessions.create(
 			{ env: "box", cwd: "~/project", createDirectory: true },
@@ -364,6 +373,12 @@ test(
 		assert.match(system, /REMOTE PROJECT sentinel/);
 		assert.match(system, /LOCAL GLOBAL sentinel/);
 		assert.match(system, /Remote skill sentinel/);
+		assert.match(
+			sections.skills ?? "",
+			new RegExp(
+				`Linked remote skill sentinel\\.</description><location>${home}/\\.agents/skills/linked/SKILL\\.md<`,
+			),
+		);
 		// Plugins' skills point at the server's files: a remote conversation gets the hint to write plugins there instead.
 		assert.doesNotMatch(sections.skills ?? "", /writing-p2-plugins/);
 		assert.match(sections["p2-plugins"] ?? "", /spawn a subagent with env null and cwd ".*\/plugins"/);

@@ -1292,7 +1292,8 @@ call, hold, method, relay and activation; nothing is measured or walked for it. 
   `~/.pi/p2/uploads/<session>/` of the machine where the receiving conversation works, before admission; inline
   images retain the local upload copy. Project instructions, skills, workspace and downloads use the conversation's
   environment. The local global AGENTS.md stays
-  local; remote skills use `~/.pi/p2/skills/`. New-session Browse directories and environment editors use route-owned
+  local; remote skills use `~/.pi/p2/skills/` and settings.json's `skillDirs` (each entry of a listed folder a skill
+  folder, links included; `~` the machine's home; see README, Configuration). New-session Browse directories and environment editors use route-owned
   locators (Back/reload); read/write remote shares require explicit confirmation at the API and in the browser.
   `envs.test.ts` uses a fake provider and disposable loopback sshd with private fixture keys/HOME (skips without sshd
   or a daemon). It covers host trust, key storage, directories, no local fallback, tools, workspace, uploads, prompt

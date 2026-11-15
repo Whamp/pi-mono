@@ -1,12 +1,13 @@
 // Prompt resources: the app guide, global and project AGENTS.md and skills reach the model, and edits apply live.
 
 import assert from "node:assert/strict";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import type { ConversationView } from "@earendil-works/pi-durable";
 import { BACKGROUND_CONTEXT } from "@p2/app/v1";
 import { Chat } from "../../plugins/chat/contract.ts";
+import { PromptResources } from "../../plugins/prompt/contract.ts";
 import { SessionLock, Sessions } from "../../plugins/sessions/contract.ts";
 import type { RefIn } from "../../src/runtime/chord.ts";
 import { type Fixture, holdIn, startFixture, until } from "./helpers.ts";
@@ -86,5 +87,32 @@ describe("prompt resources (fake provider)", () => {
 		assert.match(prompt["agents-md"] ?? "", /Project rule/);
 		assert.doesNotMatch(prompt.skills ?? "", /deploy/);
 		await locks.set({ session, lock: null }, BACKGROUND_CONTEXT);
+	});
+
+	it("adds the skills of settings.json's skillDirs, each entry a linked folder, and links added later", async () => {
+		// Fleet's layout: `~/.agents/skills/<name>`, each a link to a skill folder kept elsewhere.
+		const root = dirname(fixture.workspace);
+		const linked = async (name: string) => {
+			await mkdir(join(root, "fleet", name), { recursive: true });
+			await writeFile(
+				join(root, "fleet", name, "SKILL.md"),
+				`---\nname: ${name}\ndescription: Linked ${name} skill.\n---\nBody.`,
+			);
+			await symlink(join(root, "fleet", name), join(root, "agents", name));
+		};
+		await mkdir(join(root, "agents"));
+		await linked("review");
+		const resources = await holdIn(fixture.browser(), PromptResources, { session, conversation: 1 }, "participant");
+		const listed = (name: string) => until(resources.skills, (skills) => skills.some((skill) => skill.name === name));
+		// The setting changes live: the loads watch the listed folder from then on.
+		await writeFile(join(fixture.dataDir, "settings.json"), JSON.stringify({ skillDirs: [join(root, "agents")] }));
+		await listed("review");
+		await chat.send({ text: "linked", requestId: "4" }, BACKGROUND_CONTEXT);
+		await until(chat.view, (value) =>
+			/<name>review<\/name><description>Linked review skill\./.test(sections(value).skills ?? ""),
+		);
+		// A link added to the folder appears without a restart.
+		await linked("later");
+		await listed("later");
 	});
 });

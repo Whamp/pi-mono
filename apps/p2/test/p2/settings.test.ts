@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { BACKGROUND_CONTEXT, whenLive } from "@p2/app/v1";
 import { Settings } from "../../plugins/settings/contract.ts";
+import { validateSettings } from "../../src/runtime/settings.ts";
 import { expectChord, startFixture } from "./helpers.ts";
 
 test("Settings sets and removes top-level settings, keeps the others, and refuses invalid ones", async (t) => {
@@ -53,4 +54,11 @@ test("Settings sets and removes top-level settings, keeps the others, and refuse
 		revision: 1,
 	});
 	await expectChord(whenLive(guest.hold(Settings, {}, BACKGROUND_CONTEXT)), "forbidden");
+});
+
+test("skillDirs takes absolute and home-relative folders only", () => {
+	const skillDirs = ["~/.agents/skills", "/opt/skills", "C:\\skills"];
+	assert.deepEqual(validateSettings({ skillDirs }), { skillDirs });
+	for (const path of ["skills", "./skills", "~", "~other/skills", ""])
+		assert.throws(() => validateSettings({ skillDirs: [path] }), `refuses ${JSON.stringify(path)}`);
 });

@@ -41,6 +41,7 @@ import {
 	sessionLock,
 	workerOf,
 } from "@p2/app/v1/worker";
+import { WorkerModels } from "../models/contract.ts";
 import type { LoadedPrompt } from "./context-files.ts";
 import { PromptResources, type SkillInfo, type TemplateInfo } from "./contract.ts";
 import { envFiles, promptObserver } from "./environment.ts";
@@ -74,7 +75,7 @@ type PromptLoads = {
 	loads: Subscribable<Loaded>;
 	/** The environment its files are read through (skills, when invoked). */
 	env: () => Promise<ExecutionEnv>;
-	/** Watches and loads anew (the plugins' skills directories changed); only on this machine, which lists them. */
+	/** Watches and loads anew (the plugins' skills directories or `skillDirs` changed). */
 	rewatch: () => Promise<void>;
 	close: () => Promise<void>;
 };
@@ -82,20 +83,28 @@ type PromptLoads = {
 /** Where conversations find their prompt resources: the session's (following its moves) or their own location's. */
 type PromptFiles = {
 	readonly session: MovingPromptLoads;
-	/** Every open load watches and loads anew (the plugins' skills directories changed). */
+	/** Every open load watches and loads anew (the plugins' skills directories or `skillDirs` changed). */
 	rewatch: () => Promise<unknown>;
 	of: (id: ConversationId, context: Context, read?: DocumentReader) => Promise<PromptLoads>;
 };
 
+/** `path` (absolute or `~/…`) as an absolute path of `env`'s machine: `~` is that machine's home. */
+async function absolute(env: ExecutionEnv, path: string): Promise<string> {
+	const result = await env.absolutePath(path, BACKGROUND_CONTEXT);
+	if (!result.ok) throw new Error(result.error.message);
+	return result.value;
+}
+
 /**
- * Watches the files at `at` (through `environment`) and loads them; on this machine with the plugins' skills
- * (`pluginSkills`, read at each watch's start).
+ * Watches the files at `at` (through `environment`) and loads them, with settings.json's `skillDirs` (`skillDirs`, on
+ * that machine) and on this machine with the plugins' skills (`pluginSkills`, read at each watch's start).
  */
 function promptLoads(
 	dataDir: string,
 	at: Location,
 	environment: Promise<ExecutionEnv>,
 	pluginSkills: () => readonly string[],
+	skillDirs: () => readonly string[],
 ): PromptLoads {
 	let current = EMPTY;
 	let closed = false;
@@ -114,20 +123,9 @@ function promptLoads(
 				directory: dataDir,
 				cwd: at.cwd,
 				paths: async () => (env instanceof RemoteExecutionEnv ? remotePaths(env.connection) : nodePath),
-				skillsRoot: async () =>
-					remote
-						? await env.absolutePath("~/.pi/p2/skills", BACKGROUND_CONTEXT).then((result) => {
-								if (!result.ok) throw new Error(result.error.message);
-								return result.value;
-							})
-						: join(dataDir, "skills"),
-				promptsRoot: async () =>
-					remote
-						? await env.absolutePath("~/.pi/p2/prompts", BACKGROUND_CONTEXT).then((result) => {
-								if (!result.ok) throw new Error(result.error.message);
-								return result.value;
-							})
-						: join(dataDir, "prompts"),
+				skillsRoot: async () => (remote ? await absolute(env, "~/.pi/p2/skills") : join(dataDir, "skills")),
+				promptsRoot: async () => (remote ? await absolute(env, "~/.pi/p2/prompts") : join(dataDir, "prompts")),
+				skillDirs: () => Promise.all(skillDirs().map((path) => absolute(env, path))),
 				...(remote ? { remote } : { pluginSkills }),
 				fallbackMs: remote ? 30_000 : 2000,
 				apply: (prompt, error) => publish({ ...(prompt ? { prompt } : {}), ...(error ? { error } : {}) }),
@@ -147,7 +145,7 @@ function promptLoads(
 		current: () => current,
 		env: () => environment,
 		rewatch: async () => {
-			if (remote || closed) return;
+			if (closed) return;
 			const previous = observer;
 			observer = watch();
 			await (await previous.catch(() => undefined))?.close();
@@ -259,11 +257,14 @@ export default defineFacet((host) => {
 		const harness = harnessOf(self);
 		const skills = self.registry(PluginSkills);
 		const pluginSkills = () => [...skills.value.values()].map((entry) => entry.dir).sort();
+		const settings = self.get(WorkerModels, {});
+		const skillDirs = () => settings.settings.value.skillDirs ?? [];
 		const filesResource = self.open(
 			async () => {
 				const environments = harness().environments;
 				const dataDir = worker().init.dataDir;
-				const open = (at: Location): PromptLoads => promptLoads(dataDir, at, environments.at(at), pluginSkills);
+				const open = (at: Location): PromptLoads =>
+					promptLoads(dataDir, at, environments.at(at), pluginSkills, skillDirs);
 				const session = movingPromptLoads(worker().location, open);
 				const own = new Map<string, PromptLoads>();
 				const files: PromptFiles = {
@@ -302,25 +303,28 @@ export default defineFacet((host) => {
 				await moved;
 			}
 		});
-		// A plugin's skills come and go with its reloads: this machine's loads watch and list the new directories.
+		// A plugin's skills come and go with its reloads, `skillDirs` with settings.json: the loads watch and list the new
+		// directories.
 		self.onLive(async (ctx) => {
-			const watch = await skills.watch(ctx);
-			let listed = JSON.stringify(pluginSkills());
+			const roots = () => JSON.stringify([pluginSkills(), skillDirs()]);
+			let listed = roots();
 			let chain = Promise.resolve();
-			watch.start(async (call) => {
-				if (call.kind !== "value" || JSON.stringify(pluginSkills()) === listed) return;
-				listed = JSON.stringify(pluginSkills());
+			const changed = async (call: { kind: string }): Promise<void> => {
+				if (call.kind !== "value" || roots() === listed) return;
+				listed = roots();
 				chain = chain
 					.then(() => filesResource.value.files.rewatch())
 					.then(
 						() => {},
-						(error: unknown) => console.error("p2 prompt: watching plugins' skills:", error),
+						(error: unknown) => console.error("p2 prompt: watching skills directories:", error),
 					);
-			});
+			};
+			const watches = [await skills.watch(ctx), await settings.settings.watch(ctx)];
+			for (const watch of watches) watch.start(changed);
 			try {
 				await untilAborted(ctx);
 			} finally {
-				await watch.stop();
+				await Promise.all(watches.map((watch) => watch.stop()));
 			}
 		});
 		// Load failures of the session's resources go to the worker's log (they also leave the last good load in use).

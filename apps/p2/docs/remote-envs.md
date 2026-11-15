@@ -145,7 +145,8 @@ Attachments are copied to remote `~/.pi/p2/uploads/<session>/` on the machine of
 prompt admission. The message lists remote paths; inline images still read the private local upload copy.
 `send_file`, workspace reads/uploads and coding tools use the conversation's environment. Global `<data>/AGENTS.md`
 remains local; project instructions are read from the conversation's cwd ancestors, and skills from its machine's
-`~/.pi/p2/skills/` and `<cwd>/.pi/skills/`. Prompt watches run through
+`~/.pi/p2/skills/`, `<cwd>/.pi/skills/` and the folders listed in settings.json's `skillDirs` (`~` is the remote home;
+README, Configuration). Plugins' skills are local files and stay out of remote conversations. Prompt watches run through
 the same environment; remote prompt loading is background work so an offline host does not block worker startup.
 
 The terminals plugin opens a terminal at the viewed conversation's location (the server reads it from the catalog

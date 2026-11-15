@@ -1,5 +1,6 @@
 // Skill frontmatter/prompt conventions adapted from earendil-works/pi (MIT).
-// See third-party/pi.LICENSE. This host uses only global and cwd-local skill roots.
+// See third-party/pi.LICENSE. Skill roots: the global and cwd-local ones, the entries of settings.json's `skillDirs`
+// and the plugins'.
 import { readdir, realpath } from "node:fs/promises";
 import { basename, dirname, join, type PlatformPath, resolve } from "node:path";
 import { optionalText, stripBom } from "@p2/app/v1/node";
@@ -33,7 +34,7 @@ export type PromptFiles = {
 	/** Files of this machine (not an SSH environment's): the global `AGENTS.md` may be among the project's ones. */
 	readonly local: boolean;
 	readText(path: string): Promise<string | undefined>;
-	/** Entries of a directory, without following symbolic links. */
+	/** Entries of a directory, without following symbolic links; `undefined` when it is missing or not a directory. */
 	entries(path: string): Promise<{ name: string; kind: "file" | "directory" | "other" }[] | undefined>;
 };
 
@@ -49,7 +50,13 @@ export const localFiles: PromptFiles = {
 				kind: entry.isFile() ? "file" : entry.isDirectory() ? "directory" : "other",
 			}));
 		} catch (error) {
-			if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return undefined;
+			if (
+				error &&
+				typeof error === "object" &&
+				"code" in error &&
+				(error.code === "ENOENT" || error.code === "ENOTDIR")
+			)
+				return undefined;
 			throw new Error("Could not scan skills directory");
 		}
 	},
@@ -67,8 +74,9 @@ function escapeXml(text: string): string {
 /**
  * pi's discovery (coding-agent core/skills.ts `loadSkillsFromDir`): a directory holding `SKILL.md` is one skill and is
  * not searched further; otherwise `.md` files directly in the skills root are skills, and subdirectories are searched
- * for `SKILL.md`. Hidden entries and `node_modules` are skipped. Unlike pi, symbolic links are not followed (the watch
- * does not follow them either, and there is no cycle to guard against) and `.gitignore`-style files are not read.
+ * for `SKILL.md`. Hidden entries and `node_modules` are skipped. Unlike pi, symbolic links below the root are not
+ * followed (the watch does not follow them either, and there is no cycle to guard against; a root that is a link, as a
+ * `skillDirs` entry may be, is opened through it) and `.gitignore`-style files are not read.
  */
 async function skillFiles(files: PromptFiles, path: string, root = true): Promise<string[]> {
 	const entries = await files.entries(path);
@@ -88,6 +96,25 @@ async function skillFiles(files: PromptFiles, path: string, root = true): Promis
 	return found.flat();
 }
 
+/**
+ * The skills of settings.json's `skillDirs` folders (absolute): each entry of one (a directory or a link to one, as
+ * `~/.agents/skills/<name>` are; not a file, hidden or `node_modules`) is a skills root of its own, opened through
+ * the link. A missing folder, a broken link or one to a file has none.
+ */
+async function dirSkills(files: PromptFiles, dirs: readonly string[]): Promise<string[]> {
+	const found = await Promise.all(
+		dirs.map(async (dir) =>
+			Promise.all(
+				((await files.entries(dir)) ?? [])
+					.filter((entry) => entry.kind !== "file" && !entry.name.startsWith(".") && entry.name !== "node_modules")
+					.sort((a, b) => a.name.localeCompare(b.name))
+					.map((entry) => skillFiles(files, files.paths.join(dir, entry.name))),
+			),
+		),
+	);
+	return found.flat(2);
+}
+
 /** Each `AGENTS.md` candidate from the filesystem root down to `cwd`. */
 export function agentsCandidates(paths: Pick<PlatformPath, "join" | "dirname" | "resolve">, cwd: string): string[] {
 	const ancestors: string[] = [];
@@ -101,8 +128,9 @@ export function agentsCandidates(paths: Pick<PlatformPath, "join" | "dirname" | 
 /**
  * Instructions and skills for a session: the global `AGENTS.md` of the data directory (always local), then the
  * project's `AGENTS.md` files and skills under `<directory>/skills` and `<cwd>/.pi/skills` on the local filesystem,
- * then the plugins' skills (`pluginSkillRoots`, given only where they are files of `files`: the server's own machine).
- * The first skill of a name wins: the environment's and the project's before a plugin's.
+ * then the skills of the `skillDirs` folders (absolute paths of `files`), then the plugins' skills (`pluginSkillRoots`,
+ * given only where they are files of `files`: the server's own machine). The first skill of a name (and of a path)
+ * wins, in this order, as in pi.
  */
 export async function loadPromptResources(
 	directory: string,
@@ -111,6 +139,7 @@ export async function loadPromptResources(
 	skillsRoot = join(directory, "skills"),
 	promptsRoot = join(directory, "prompts"),
 	pluginSkillRoots: readonly string[] = [],
+	skillDirs: readonly string[] = [],
 ): Promise<LoadedPrompt> {
 	const agents: { text: string; global: boolean }[] = [];
 	const fingerprint: string[] = [];
@@ -130,10 +159,11 @@ export async function loadPromptResources(
 	const skills = new Map<string, Skill>();
 	const environmentSkills = await skillFiles(files, skillsRoot);
 	const projectSkills = await skillFiles(files, files.paths.join(cwd, ".pi", "skills"));
+	const listedSkills = await dirSkills(files, skillDirs);
 	const pluginSkills = (await Promise.all(pluginSkillRoots.map((root) => skillFiles(files, root)))).flat();
-	// Plugins' skills count as global ones: a locked session gets them only with the global instructions.
-	const globalSkills = new Set([...environmentSkills, ...pluginSkills]);
-	const paths = [...new Set([...environmentSkills, ...projectSkills, ...pluginSkills])];
+	// `skillDirs`' and plugins' skills count as global ones: a locked session gets them only with the global instructions.
+	const globalSkills = new Set([...environmentSkills, ...listedSkills, ...pluginSkills]);
+	const paths = [...new Set([...environmentSkills, ...projectSkills, ...listedSkills, ...pluginSkills])];
 	for (const path of paths) {
 		const content = await files.readText(path);
 		if (content === undefined) continue;

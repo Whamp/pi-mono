@@ -54,6 +54,11 @@ const schema = obj({
 	 */
 	cacheWarming: opt(StringEnum(["off", "streaming", "idle"] as const)),
 	/**
+	 * p2 addition: more skill folders, each on the machine where a conversation works (`~/` is that machine's home), such
+	 * as `~/.agents/skills`. Every entry of one (a directory or a link to one) is a skill directory of its own.
+	 */
+	skillDirs: opt(arr(str({ minLength: 2, maxLength: 4096, pattern: "^(~/|/|[A-Za-z]:[\\\\/])" }), { maxItems: 100 })),
+	/**
 	 * p2 addition: how much of a turn the web chat shows, from 1 (only the answer; everything else on one wheel per
 	 * turn) to 4 (thinking in full and each tool call as a row; no wheels). Default 2: the agent's texts in the
 	 * transcript, thinking and tool calls on a wheel between them. See `Detail` in src/web/activity/model.ts.

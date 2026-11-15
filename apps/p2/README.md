@@ -223,6 +223,21 @@ agent's texts and its tool calls on one wheel per turn; 2 the texts too, thinkin
 3 thinking too (collapsed), only runs of tool calls on wheels; 4 thinking in full and each tool call as its own row,
 no wheels.
 
+`skillDirs` lists more skill folders, such as the folder of skills that Codex, Claude Code and pi share:
+
+```json
+{ "skillDirs": ["~/.agents/skills"] }
+```
+
+Each path is absolute or starts with `~/`, and is read on the machine where the conversation works: `~` is that
+machine's home, so a session on an SSH environment reads the remote folder. Every entry of a listed folder (a folder,
+or a link to one; not a file, a hidden entry or `node_modules`) is one skill folder, found as in `<P2_DATA_DIR>/skills`.
+These skills come after the global and the project's skills and before the plugins' ones; the first skill of a name
+wins, so a skill a plugin also registers is listed once. They count as global skills: a locked session gets them only
+with the global instructions. Adding or removing an entry, or changing the setting, applies at once. p2 does not watch
+inside linked folders: a changed name or description there shows after the next reload of the prompt resources (any
+watched change, or the next session start). The skill's file itself is read fresh whenever it is used.
+
 **Server name.** The server goes by the device's name (on macOS the computer name, else the host name), read again at
 every start. Settings, General, **Server name** gives it a name of its own (one line, at most 63 characters), kept in
 `<P2_DATA_DIR>/identity.json` (`{ "name": "Studio" }`); clearing the field removes the file and the device's name
