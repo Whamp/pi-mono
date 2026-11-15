@@ -328,6 +328,30 @@ streams (up to an hour, e.g. during a long tool call); `"idle"` also warms the m
 after its run answered. The refreshes count in the conversation's cost. `stream.cacheRetention: "long"` writes 1-hour
 cache entries instead (at twice the input price).
 
+### Routines
+
+A routine sends a set message to a session at a set time each day. `<P2_DATA_DIR>/routines.json` lists them:
+
+```json
+{
+	"p3-watch": {
+		"time": "08:00",
+		"timeZone": "America/Los_Angeles",
+		"session": "<target session ID>",
+		"message": "Check what changed since {lastRun}."
+	}
+}
+```
+
+`time` is `HH:MM` in `timeZone` (an IANA zone; the server's own without it). `from` names the sending session; without
+it the Familiar sends. `{lastRun}` in the message becomes the date of the routine's previous run ("never" before the
+first). The server reads the file every minute, so edits apply within a minute; an invalid file or a failed send shows
+as an owner notice. The server remembers each routine's last run: after a restart it does not send twice, and when it
+was down at the set time it sends once when it is back, on the same day only. A routine added after its time today
+first runs tomorrow. To run one now, ask an agent to call the code-mode tool `routines_run` (namespace `routines`;
+`routines_list` shows each routine's last run and failure); a run now counts as the day's run. Agents of shared or
+locked sessions cannot use these tools.
+
 ### Voice mode
 
 Voice mode talks to the agent hands-free: the microphone button in the composer (owner only) streams your speech to a

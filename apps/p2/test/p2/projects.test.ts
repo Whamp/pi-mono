@@ -8,8 +8,9 @@ import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { BACKGROUND_CONTEXT, whenLive } from "@p2/app/v1";
+import { ProjectSchema as ConversationsProjectSchema } from "../../plugins/conversations/contract.ts";
 import { parseProjects } from "../../plugins/projects/config.ts";
-import { below, Projects, placeOn } from "../../plugins/projects/contract.ts";
+import { below, ProjectSchema, Projects, placeOn } from "../../plugins/projects/contract.ts";
 import { ProjectStore } from "../../plugins/projects/store.ts";
 import { Sessions } from "../../plugins/sessions/contract.ts";
 import { expectChord, holdIn, poll, startFixture, until } from "./helpers.ts";
@@ -45,6 +46,10 @@ test("projects.json: order kept, a place without env is this device, invalid fil
 		['{ "": [{ "path": "/a" }] }', /Invalid project name/],
 	] as const)
 		assert.throws(() => parseProjects(content), error, content);
+});
+
+test("the conversations contract's copy of ProjectSchema is the same schema", () => {
+	assert.deepEqual(ConversationsProjectSchema, ProjectSchema);
 });
 
 test("a directory's subpath below a place, from the paths alone", () => {

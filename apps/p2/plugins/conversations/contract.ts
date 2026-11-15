@@ -1,6 +1,11 @@
 import { arr, bool, nul, num, obj, opt, type Static, str, union } from "@earendil-works/pi-schema";
 import { literal, local, method, param, propertiesOf, remote, serverHost, sessionHost } from "@p2/app/v1";
-import { ProjectSchema } from "../projects/contract.ts";
+
+/**
+ * The projects plugin's `ProjectSchema`, copied: other plugins import this contract (the routines plugin), and a file
+ * copied into another plugin may import only host packages (a test keeps the two equal).
+ */
+export const ProjectSchema = obj({ name: str(), places: arr(obj({ env: union([str(), nul()]), path: str() })) });
 
 /** A session ID as the tool takes it (`to`). */
 const To = str({ minLength: 1, maxLength: 200 });

@@ -1508,6 +1508,15 @@ call, hold, method, relay and activation; nothing is measured or walked for it. 
   navigate to roots (restoring archives); guests get plain labels. `test/p2/conversations.test.ts` covers list/send/
   answer, peer replies, restart deduplication, concurrent cross-sends, busy answers, follow-ups,
   invalid destinations, reload, guest turns, child tool exclusion and inaccessible public ingress.
+- **Routines** (`plugins/routines`, README "Routines"): `routines.json` names daily messages (time, time zone, target
+  session, optional sender, default the Familiar). The server's host-lifetime `RoutineService` reads the file every
+  minute and sends each due routine through `ConversationBroker` (`schedule.ts` decides; one request ID per routine
+  and day, so a repeated send is dropped). Its persisted state keeps each routine's first sight and last run date:
+  no double send after a restart, a missed time caught up the same day only, a routine added after its time waits
+  for tomorrow. `Routines` (owner, and agents of sessions neither shared nor locked) lists them and runs one now (its
+  own request ID; it counts as the day's run); the agent reaches it through the deferred code-mode tools
+  `routines_list` and `routines_run`. The conversations contract copies `ProjectSchema`: a contract another plugin
+  imports may import only host packages (`test/p2/projects.test.ts` keeps the copy equal).
 - **Familiar** (`plugins/familiar`): one long-running session above the others that keeps track of them and starts,
   steers, stops, archives and restores them. The server's `FamiliarStore` holds which session it is (persisted; the
   ID is chosen before the row is made, so a crash makes the same one); the owner's `Familiar.open` makes it on first
