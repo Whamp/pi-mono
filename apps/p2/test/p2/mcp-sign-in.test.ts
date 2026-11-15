@@ -17,7 +17,7 @@ import { type Instance, Mcp, McpManager } from "../../plugins/mcp/contract.ts";
 import { mcpServerFacet } from "../../plugins/mcp/server.ts";
 import { Catalog, type Session, SessionLocks } from "../../plugins/sessions/contract.ts";
 import { ChildStore } from "../../plugins/subagents/contract.ts";
-import { APP, holdIn, TEST, testHost, until } from "./helpers.ts";
+import { APP, holdIn, http, TEST, testHost, until } from "./helpers.ts";
 
 const OWNER: P2Principal = { kind: "owner", access: "local" };
 const RELAY_OWNER: P2Principal = { kind: "owner", access: "relay" };
@@ -220,7 +220,7 @@ async function signInHost(
 		void fixture.root((ctx) => route(request, response, access, ctx));
 	});
 	await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-	const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+	const port = (server.address() as AddressInfo).port;
 	t.after(async () => {
 		worker.release();
 		await until(manager.leases, (leases) => leases.length === 0);
@@ -233,12 +233,25 @@ async function signInHost(
 		worker,
 		owner: () => holdIn(fixture.client(OWNER), Mcp, {}, "owner"),
 		/** A request to the routes as `principal` reaching p2 through `origin` (loopback by default). */
-		http: (path: string, principal: P2Principal | undefined, origin = "http://127.0.0.1:8788", headers = {}) => {
+		http: async (
+			path: string,
+			principal: P2Principal | undefined,
+			origin = "http://127.0.0.1:8788",
+			headers = {},
+		) => {
 			access = {
 				principal,
 				origin: { origin, remote: !origin.startsWith("http://127.0.0.1"), port: 8788 },
 			};
-			return fetch(base + path, { redirect: "manual", headers });
+			// node:http preserves Fetch Metadata; fetch overwrites Sec-Fetch-Mode with `cors`.
+			const result = await http(port, path, { headers });
+			const responseHeaders = new Headers();
+			for (const [name, values] of Object.entries(result.headers)) {
+				if (values !== undefined) {
+					for (const value of [values].flat()) responseHeaders.append(name, value);
+				}
+			}
+			return new Response(result.body, { status: result.status, headers: responseHeaders });
 		},
 	};
 }
@@ -367,6 +380,71 @@ test("refused tokens refresh without a browser; signing out forgets them and wai
 	assert.notEqual(docs(owner.instances.value)?.status, "connected", "signed out instances reconnect at once");
 	await until(owner.instances, (list) => docs(list)?.status === "sign-in");
 	assert.doesNotMatch(readFileSync(join(host.dataDir, "mcp-auth.json"), "utf8"), /access-/);
+});
+
+test("foreign top-level MCP navigations recover owner cookies before starting or completing OAuth", async (t) => {
+	const oauth = await authorizationServer(t);
+	const host = await signInHost(t, oauth);
+	const owner = await host.owner();
+	await until(owner.instances, (list) => docs(list)?.status === "sign-in");
+	const launch = { "sec-fetch-site": "cross-site", "sec-fetch-mode": "navigate", "sec-fetch-dest": "empty" };
+	for (const site of ["cross-site", "same-site"]) {
+		for (const dest of ["empty", "document"]) {
+			const page = await host.http("/mcp/sign-in/docs?via=callback", undefined, BRAIN, {
+				...launch,
+				"sec-fetch-site": site,
+				"sec-fetch-dest": dest,
+			});
+			assert.equal(page.status, 401);
+			const html = await page.text();
+			assert.match(html, /location\.replace\(location\.href\)/);
+			const nonce = /<script nonce="([^"]+)">/.exec(html)?.[1];
+			assert.ok(nonce);
+			assert.ok(page.headers.get("content-security-policy")?.includes(`script-src 'nonce-${nonce}'`));
+		}
+	}
+	assert.equal(owner.signIns.value.length, 0, "recovery itself starts no OAuth flow");
+	const start = await host.http("/mcp/sign-in/docs?via=callback", RELAY_OWNER, BRAIN, {
+		...launch,
+		"sec-fetch-site": "same-origin",
+	});
+	assert.equal(start.status, 302);
+	const back = await redirectOf(start.headers.get("location") ?? "");
+	const path = `/mcp/callback${back.search}`;
+	const recovery = await host.http(path, undefined, BRAIN, launch);
+	assert.equal(recovery.status, 401);
+	assert.match(await recovery.text(), /location\.replace\(location\.href\)/);
+	assert.deepEqual(oauth.grants, [], "recovery does not consume the authorization code");
+	assert.equal(owner.signIns.value[0]?.status, "waiting");
+	const done = await host.http(path, RELAY_OWNER, BRAIN, { ...launch, "sec-fetch-site": "same-origin" });
+	assert.equal(done.status, 200);
+	assert.match(await done.text(), /Signed in to docs/);
+	await until(owner.instances, (list) => docs(list)?.status === "connected");
+	assert.deepEqual(oauth.grants, ["authorization_code"]);
+});
+
+test("MCP recovery never loops or runs for guests, foreign fetches or frames", async (t) => {
+	const oauth = await authorizationServer(t);
+	const host = await signInHost(t, oauth);
+	const launch = { "sec-fetch-site": "cross-site", "sec-fetch-mode": "navigate", "sec-fetch-dest": "empty" };
+	for (const path of ["/mcp/sign-in/docs", "/mcp/callback?state=unused&code=unused"]) {
+		for (const headers of [
+			{},
+			{ ...launch, "sec-fetch-site": "same-origin" },
+			{ ...launch, "sec-fetch-site": "none" },
+			{ ...launch, "sec-fetch-mode": "cors" },
+			{ ...launch, "sec-fetch-mode": "no-cors" },
+			{ ...launch, "sec-fetch-dest": "iframe" },
+		]) {
+			const denied = await host.http(path, undefined, BRAIN, headers);
+			assert.equal(denied.status, 401);
+			assert.doesNotMatch(await denied.text(), /location\.replace/);
+		}
+		const guest = await host.http(path, GUEST, BRAIN, launch);
+		assert.equal(guest.status, 403);
+		assert.doesNotMatch(await guest.text(), /location\.replace/);
+	}
+	assert.deepEqual(oauth.grants, []);
 });
 
 test("guests and anonymous visitors get no sign-in route; unknown servers fail", async (t) => {

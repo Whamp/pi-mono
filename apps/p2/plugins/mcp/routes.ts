@@ -7,7 +7,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { type Ctx, isOwner, type StoreSelf } from "@p2/app/v1";
 import { type RequestAccess, Routes } from "@p2/app/v1/server";
 import { McpManager } from "./contract.ts";
-import { resultPage, sendPage, sendProbePage } from "./pages.ts";
+import { recoverOwnerNavigation, resultPage, sendPage, sendProbePage } from "./pages.ts";
 
 /** Contributes the sign-in routes. */
 export function signInRoutes(self: StoreSelf): void {
@@ -30,7 +30,10 @@ async function signIn(
 	{ principal, origin }: RequestAccess,
 	ctx: Ctx,
 ): Promise<void> {
-	if (!isOwner(principal)) return refuse(response, principal === undefined);
+	if (!isOwner(principal)) {
+		if (principal === undefined && recoverOwnerNavigation(request, response)) return;
+		return refuse(response, principal === undefined);
+	}
 	const url = new URL(request.url ?? "/", "http://localhost");
 	let name: string;
 	try {
@@ -74,7 +77,8 @@ async function callback(
 	ctx: Ctx,
 ): Promise<void> {
 	const params = new URL(request.url ?? "/", "http://localhost").searchParams;
-	if (!isOwner(principal))
+	if (!isOwner(principal)) {
+		if (principal === undefined && recoverOwnerNavigation(request, response)) return;
 		return sendPage(
 			response,
 			principal === undefined ? 401 : 403,
@@ -83,6 +87,7 @@ async function callback(
 				"This browser is not signed in to p2 here. Copy this page's full address from the address bar and paste it in p2's MCP panel.",
 			),
 		);
+	}
 	const state = params.get("state");
 	if (state === null)
 		return sendPage(response, 400, resultPage("Sign-in not finished", "The authorization response has no state."));

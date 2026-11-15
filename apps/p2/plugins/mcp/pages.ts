@@ -2,7 +2,7 @@
 // runs on the p2 host before choosing where the sign-in returns. Plain HTML with their own strict CSP.
 
 import { randomBytes } from "node:crypto";
-import type { ServerResponse } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 
 /** A page saying `title`, then `message`. */
 export function resultPage(title: string, message: string): string {
@@ -23,6 +23,35 @@ export function sendPage(response: ServerResponse, status: number, html: string,
 		].join("; "),
 	});
 	response.end(html);
+}
+
+/**
+ * Reloads a foreign top-level MCP navigation from p2's own origin to recover the owner's cookie. This page grants no
+ * access; the same-origin load must authenticate normally and cannot enter this recovery again. Android WebAPK
+ * launches use destination `empty` rather than `document`. The full URL retains an OAuth callback's state and code.
+ */
+export function recoverOwnerNavigation(request: IncomingMessage, response: ServerResponse): boolean {
+	const site = request.headers["sec-fetch-site"];
+	const dest = request.headers["sec-fetch-dest"];
+	if (
+		request.method !== "GET" ||
+		(site !== "cross-site" && site !== "same-site") ||
+		request.headers["sec-fetch-mode"] !== "navigate" ||
+		(dest !== "document" && dest !== "empty")
+	) {
+		return false;
+	}
+	const nonce = randomBytes(16).toString("base64");
+	sendPage(
+		response,
+		401,
+		document(
+			"Checking p2 sign-in",
+			`<h1>Checking p2 sign-in</h1><p>Loading this page again to check your owner sign-in…</p><script nonce="${nonce}">location.replace(location.href);</script>`,
+		),
+		[`script-src 'nonce-${nonce}'`],
+	);
+	return true;
 }
 
 /**

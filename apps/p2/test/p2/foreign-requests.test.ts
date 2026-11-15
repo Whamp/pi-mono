@@ -134,6 +134,32 @@ describe("foreign browser requests", () => {
 		}
 	});
 
+	it("MCP entry and callback pages recover foreign top-level navigation without trusting its cookie", async () => {
+		const launch = { "Sec-Fetch-Site": "cross-site", "Sec-Fetch-Mode": "navigate", "Sec-Fetch-Dest": "empty" };
+		for (const path of ["/mcp/sign-in/not-configured?via=callback", "/mcp/callback?state=unused&code=unused"]) {
+			for (const cookie of ["", device]) {
+				const recovery = await http(port, path, { headers: { ...launch, Cookie: cookie } });
+				assert.equal(recovery.status, 401, "the foreign request still gets no principal");
+				assert.match(recovery.body, /location\.replace\(location\.href\)/);
+			}
+			const anonymous = await http(port, path, { headers: { ...NAVIGATE, "Sec-Fetch-Site": "same-origin" } });
+			assert.equal(anonymous.status, 401);
+			assert.doesNotMatch(anonymous.body, /location\.replace/, "a browser without an owner cookie cannot loop");
+			const owner = await http(port, path, {
+				headers: { ...NAVIGATE, "Sec-Fetch-Site": "same-origin", Cookie: device },
+			});
+			assert.equal(owner.status, path.startsWith("/mcp/sign-in/") ? 502 : 400, "only the owner reaches MCP");
+			for (const headers of [
+				{ ...launch, "Sec-Fetch-Mode": "cors" },
+				{ ...launch, "Sec-Fetch-Dest": "iframe" },
+			]) {
+				const denied = await http(port, path, { headers: { ...headers, Cookie: device } });
+				assert.equal(denied.status, 401);
+				assert.doesNotMatch(denied.body, /location\.replace/);
+			}
+		}
+	});
+
 	it(
 		"in Chromium, a page on another local port can neither read nor drive p2; its links open the app",
 		{ skip: !browserTests, timeout: 120_000 },
