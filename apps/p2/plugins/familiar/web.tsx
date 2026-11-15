@@ -97,7 +97,10 @@ function OwnerHome() {
 			void familiar
 				.open(BACKGROUND_CONTEXT)
 				.then(({ id }) => nav.replace(conversationRoute(current, id), current))
-				.catch(fail)
+				.catch((error: unknown) => {
+					fail(error);
+					return nav.replace(NEW_SESSION, current);
+				})
 				.finally(() => {
 					opening.current = false;
 				});
