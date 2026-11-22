@@ -1,14 +1,18 @@
 // Local configuration for the prototype. An optional scheduled run arms one Durable sleep.
 import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join } from "node:path";
-import { compile, num, obj, opt, str } from "@earendil-works/pi-schema";
+import { compile, nul, num, obj, opt, str, union } from "@earendil-works/pi-schema";
 import { record } from "@p2/app/v1";
 import { LocationSchema } from "./contract.ts";
+
+const Location = obj({ env: union([str(), nul()]), folder: str() });
 
 const Settings = compile(
 	obj({
 		url: str(),
 		tokenFile: str(),
+		locations: opt(obj({ fleet: opt(Location), household: opt(Location), shop: opt(Location) })),
 		scripts: opt(record(str())),
 		schedule: opt(
 			obj({
@@ -34,5 +38,13 @@ export async function loadDoneSettings(dataDir: string) {
 	}
 	const parsed: unknown = JSON.parse(source);
 	if (!Settings.check(parsed)) throw new Error("Invalid done.json settings");
-	return parsed;
+	const { locations, ...settings } = parsed;
+	return {
+		...settings,
+		locations: {
+			fleet: locations?.fleet ?? { env: "fleet", folder: "~/agents-world/fleet" },
+			household: locations?.household ?? { env: null, folder: join(homedir(), "agents-world/household") },
+			shop: locations?.shop ?? { env: null, folder: join(homedir(), "agents-world/shop") },
+		},
+	};
 }

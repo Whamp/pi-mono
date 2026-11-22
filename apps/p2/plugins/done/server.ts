@@ -1,6 +1,5 @@
 // The inbox follower, card/session links and worker wakeups live on the server, apart from the conversation store.
 import { appendFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { bool, int, obj, str } from "@earendil-works/pi-schema";
 import {
@@ -72,9 +71,13 @@ export default defineFacet((host) => {
 			() => loadDoneSettings(server.info.value.dataDir),
 			() => {},
 		);
-		const api = () => {
+		const configuration = () => {
 			const config = settings.value;
 			if (!config) throw forbidden("Done is not configured.");
+			return config;
+		};
+		const api = () => {
+			const config = configuration();
 			return new DoneApi(config.url, config.tokenFile);
 		};
 		const trace = async (
@@ -128,12 +131,13 @@ export default defineFacet((host) => {
 					draft.cards[card] = saved;
 				}, ctx);
 			}
+			const { env, folder } = configuration().locations[link.location];
 			await sessions.create(
 				{
 					id: link.session,
 					title,
-					env: location === "fleet" ? "fleet" : null,
-					cwd: location === "fleet" ? "~/agents-world/fleet" : join(homedir(), "agents-world", location),
+					env,
+					cwd: folder,
 				},
 				ctx,
 			);
