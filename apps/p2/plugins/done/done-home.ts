@@ -398,7 +398,7 @@ export function registerDoneHome(host: FacetHost) {
 							throw forbidden("This card cannot be handed over again. Ask the owner where it belongs.");
 						}
 						const detail = `Hand-over from ${link.location} to ${location}. ${reason}`;
-						await api(link.location).comment(card, detail);
+						await api("Home").comment(card, detail);
 						await state.change((draft) => {
 							draft.cards[card].transferred = true;
 							enqueueDispatch(draft, { card, location, transfer: true }, detail);
