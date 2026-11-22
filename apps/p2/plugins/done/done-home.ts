@@ -1,6 +1,5 @@
 // Route cards to one moving session in C or through Home in D. Done owns the card and the owner's words.
 import { appendFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { obj, str } from "@earendil-works/pi-schema";
 import { type Ctx, expectVariant, type FacetHost, forbidden, isWorker, local, method, sleep } from "@p2/app/v1";
@@ -106,7 +105,7 @@ export function registerDoneHome(host: FacetHost) {
 					}, ctx);
 				}
 				const row = await sessions.create(
-					{ id, title: `${donePatternMark(config.pattern)} · Home`, cwd: homedir() },
+					{ id, title: `${donePatternMark(config.pattern)} · Home`, cwd: server.info.value.dataDir },
 					ctx,
 				);
 				if (row.archivedAt !== null) await sessions.restore({ id }, ctx);
