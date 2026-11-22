@@ -367,24 +367,26 @@ export function registerDoneHome(host: FacetHost) {
 						if (direct) {
 							await publishHomeUpdate(api(link.location), link.target ?? card, body, version);
 						}
-						await state.change((draft) => {
-							const notice = ++draft.serial;
-							const message: HomeNotice = direct
-								? { kind: "state", card, state: result }
-								: { kind: "publish", card, notice };
-							draft.cards[card].state = result;
-							draft.outbox[notice] = message;
-							if (!direct) {
-								draft.reports[notice] = {
-									card,
-									...(body.write ? { write: body.write } : {}),
-									...(body.question ? { question: body.question } : {}),
-									...(body.complete ? { complete: body.complete } : {}),
-									...(body.draft ? { draft: body.draft } : {}),
-									...(body.comment ? { comment: body.comment } : {}),
-								};
-							}
-						}, ctx);
+						if (!direct || link.state !== result) {
+							await state.change((draft) => {
+								const notice = ++draft.serial;
+								const message: HomeNotice = direct
+									? { kind: "state", card, state: result }
+									: { kind: "publish", card, notice };
+								draft.cards[card].state = result;
+								draft.outbox[notice] = message;
+								if (!direct) {
+									draft.reports[notice] = {
+										card,
+										...(body.write ? { write: body.write } : {}),
+										...(body.question ? { question: body.question } : {}),
+										...(body.complete ? { complete: body.complete } : {}),
+										...(body.draft ? { draft: body.draft } : {}),
+										...(body.comment ? { comment: body.comment } : {}),
+									};
+								}
+							}, ctx);
+						}
 						await trace(card, direct ? "location published" : "report ready", {
 							target: link.target ?? card,
 							state: result,
