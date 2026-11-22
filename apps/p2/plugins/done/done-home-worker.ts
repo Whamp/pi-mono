@@ -37,6 +37,7 @@ const HomeWorkerDoc = defineDoc<{ scripts: Record<string, string> }>({
 });
 
 const HOME_TOOLS = ["done_dispatch", "done_report", "done_publish"];
+const ROAMING_TOOLS = ["done_read", "done_update", "done_move", "bash", "read", "edit", "write"];
 const NOTICE = compile(Notice);
 
 /** Register Home tools only in the Familiar and its assigned location sessions. */
@@ -44,7 +45,7 @@ export function registerDoneHomeWorker(host: FacetHost) {
 	contribute(host, "p2.done-home-tools", (self) => {
 		const worker = workerOf(self);
 		const role = worker().init.values[HOME_ROLE];
-		if (role !== "home" && role !== "location") {
+		if (role !== "home" && role !== "location" && role !== "roaming") {
 			return;
 		}
 		const config = self.registry(HarnessConfig);
@@ -109,8 +110,10 @@ export function registerDoneHomeWorker(host: FacetHost) {
 							(args) => ({ kind: "update", ...args }),
 						),
 						tool(
-							"done_transfer",
-							"Ask Home to hand this card to another location. Give one short reason about where work belongs, with no quotes or retelling of owner's words. End the turn after handing over.",
+							role === "roaming" ? "done_move" : "done_transfer",
+							role === "roaming"
+								? "Move this conversation to another done location for the same card. Give one short reason. End the turn so P2 can move the session and continue the card there."
+								: "Ask Home to hand this card to another location. Give one short reason about where work belongs, with no quotes or retelling of owner's words. End the turn after handing over.",
 							Transfer,
 							(args) => ({ kind: "transfer", ...args }),
 						),
@@ -122,6 +125,9 @@ export function registerDoneHomeWorker(host: FacetHost) {
 				section("done-home", async (input, context) => {
 					if (!(await isTopLevel(input.read, input.conversationId, context))) {
 						return undefined;
+					}
+					if (role === "roaming") {
+						return "You are the one done agent for this board. Each card input is its ID. Call done_read with that ID. Work only on that card. Read AGENTS.md here before work at each location. Follow the location's approval rules. Use done_move and end the turn when the same card needs work elsewhere. Use done_update to write your findings or ask a question, and end the turn after asking. Done admits the exact answer in a later turn. Keep other cards' context separate. Do the work yourself.";
 					}
 					return role === "home"
 						? "You are Home for done. For a dispatch notice use done_dispatch with its card and notice number. The service applies the fixed table. Only infer the location when the notice contains unresolved owner words. When you cannot tell, leave the location out to ask the owner. For a publish notice use done_report then done_publish. State notices update your picture and need no tool. Do not send a retelling to a specialist or do their work yourself."
@@ -145,7 +151,7 @@ export function registerDoneHomeWorker(host: FacetHost) {
 						const notice = NOTICE.check(candidate) ? candidate : undefined;
 						const results = messages.slice(userIndex + 1).filter((message) => message.role === "toolResult");
 						const trackedCard =
-							notice?.card ?? (role === "location" && /^[a-z0-9]{10}$/.test(turn) ? turn : undefined);
+							notice?.card ?? (role !== "home" && /^[a-z0-9]{10}$/.test(turn) ? turn : undefined);
 						await log("model called", turn, context, trackedCard);
 						const models = config.value.get("default")?.models();
 						if (!models || !("setProvider" in models) || typeof models.setProvider !== "function") {
@@ -165,7 +171,7 @@ export function registerDoneHomeWorker(host: FacetHost) {
 								}),
 								{ stopReason: "toolUse" },
 							);
-						} else if (role === "location") {
+						} else if (role !== "home") {
 							const scripts = (await api.snapshot(HomeWorkerDoc, context))?.scripts ?? {};
 							response = await doneLocationScriptResponse({
 								turn,
@@ -187,7 +193,7 @@ export function registerDoneHomeWorker(host: FacetHost) {
 				}),
 			],
 			wraps:
-				role === "location"
+				role !== "home"
 					? [
 							{
 								kind: "tool",
@@ -206,40 +212,54 @@ export function registerDoneHomeWorker(host: FacetHost) {
 		self.contribute(Extensions, { [extension.name]: extension });
 	});
 
-	host.serve(DoneHomeIngress, (_params, principal, self) => {
-		if (principal.kind !== "server") {
-			throw forbidden("Only the server submits Home notices.");
-		}
-		const harness = harnessOf(self);
-		return {
-			variant: "server",
-			members: {
-				submit: async (body, ctx) => {
-					const durable = harness().durable;
-					const main = await mainConversation(durable, ctx);
-					await durable.commit(async (tx) => {
-						if (body.kind === "home") {
-							const agent = await tx.doc(AgentDoc, main);
-							agent.tools = [...new Set([...(Array.isArray(agent.tools) ? agent.tools : []), ...HOME_TOOLS])];
-							agent.modelTools = [
-								...new Set([...(Array.isArray(agent.modelTools) ? agent.modelTools : []), ...HOME_TOOLS]),
-							];
-						} else if (body.script) {
-							(await tx.doc(HomeWorkerDoc)).scripts[body.card] = body.script;
+	host.serve(
+		DoneHomeIngress,
+		(_params, principal, self) => {
+			if (principal.kind !== "server") {
+				throw forbidden("Only the server submits Home notices.");
+			}
+			const harness = harnessOf(self);
+			const worker = workerOf(self);
+			return {
+				variant: "server",
+				members: {
+					idle: async (_args, ctx) => {
+						const { tasks, submissions } = await harness().durable.inspect(ctx);
+						return tasks.length === 0 && submissions.length === 0;
+					},
+					submit: async (body, ctx) => {
+						const durable = harness().durable;
+						const main = await mainConversation(durable, ctx);
+						await durable.commit(async (tx) => {
+							if (body.kind === "home") {
+								const agent = await tx.doc(AgentDoc, main);
+								agent.tools = [...new Set([...(Array.isArray(agent.tools) ? agent.tools : []), ...HOME_TOOLS])];
+								agent.modelTools = [
+									...new Set([...(Array.isArray(agent.modelTools) ? agent.modelTools : []), ...HOME_TOOLS]),
+								];
+							} else if (body.script) {
+								(await tx.doc(HomeWorkerDoc)).scripts[body.card] = body.script;
+							}
+							if (worker().init.values[HOME_ROLE] === "roaming") {
+								const agent = await tx.doc(AgentDoc, main);
+								agent.tools = [...ROAMING_TOOLS];
+								agent.modelTools = [...ROAMING_TOOLS];
+							}
+						}, ctx);
+						const conversation = await durable.conversation(main, ctx);
+						if (!conversation) {
+							throw new Error("Home input has no main conversation.");
 						}
-					}, ctx);
-					const conversation = await durable.conversation(main, ctx);
-					if (!conversation) {
-						throw new Error("Home input has no main conversation.");
-					}
-					const content = body.kind === "home" ? HOME_NOTICE_PREFIX + JSON.stringify(body.notice) : body.card;
-					await conversation.submit(
-						{ type: "input", content, requestId: body.requestId, whenBusy: "followUp" },
-						ctx,
-					);
-					return null;
+						const content = body.kind === "home" ? HOME_NOTICE_PREFIX + JSON.stringify(body.notice) : body.card;
+						await conversation.submit(
+							{ type: "input", content, requestId: body.requestId, whenBusy: "followUp" },
+							ctx,
+						);
+						return null;
+					},
 				},
-			},
-		};
-	});
+			};
+		},
+		{ accepts: { 1: {} } },
+	);
 }

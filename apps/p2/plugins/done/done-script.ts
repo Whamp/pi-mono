@@ -50,7 +50,9 @@ export function createDoneScript(self: Self) {
 						if (!script) throw new Error(`No done fake script named ${link.script}`);
 						const results = messages.slice(userIndex + 1).filter((message) => message.role === "toolResult");
 						if (script[results.length]) {
-							response = doneScriptResponse(script, results);
+							response = doneScriptResponse(script, results, (args) =>
+								bindDoneScriptArgs(args, link.card, results),
+							);
 						}
 					}
 					provider.setResponses([response]);
@@ -60,6 +62,25 @@ export function createDoneScript(self: Self) {
 			}),
 		],
 	});
+}
+
+function bindDoneScriptArgs(
+	args: ScriptStep["args"],
+	card: string,
+	results: Extract<Message, { role: "toolResult" }>[],
+) {
+	const commit = results
+		.map(messageText)
+		.join("\n")
+		.match(/shop commit: ([0-9a-f]{7,40})\b/)?.[1];
+	const bind = (value: JsonValue): JsonValue => {
+		if (Array.isArray(value)) return value.map(bind);
+		if (value !== null && typeof value === "object")
+			return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, bind(entry)]));
+		if (typeof value !== "string") return value;
+		return value === "$card" ? card : value.replaceAll("$shopCommit", commit ?? "(commit missing)");
+	};
+	return Object.fromEntries(Object.entries(args).map(([key, value]) => [key, bind(value)]));
 }
 
 /** Execute one scripted response only when the real preceding tool result agrees. */
@@ -99,7 +120,7 @@ export async function doneLocationScriptResponse({ turn, scripts, dataDir, resul
 		const event = read.match(/"ownerAction":\{[^}]*?"type":"([^"]+)"/)?.[1];
 		const phase = event && event !== "item.added" ? `${script}-${event}` : script;
 		const steps = [{ tool: "done_read", args: { card: turn } }, ...(fixtures[phase] ?? [])];
-		return doneScriptResponse(steps, results, (args) => (args.card === "$card" ? { ...args, card: turn } : args));
+		return doneScriptResponse(steps, results, (args) => bindDoneScriptArgs(args, turn, results));
 	}
 	if (Object.keys(scripts).length === 0 || /^[a-z0-9]{10}$/.test(turn)) {
 		return fauxAssistantMessage("Recorded.");

@@ -1,6 +1,6 @@
 // Home admits typed notices. The location input carries only a card ID.
-import { int, obj, opt, type Static, str, union } from "@earendil-works/pi-schema";
-import { literal, method, param, propertiesOf, remote, serverHost, sessionHost } from "@p2/app/v1";
+import { bool, int, nul, obj, opt, type Static, str, union } from "@earendil-works/pi-schema";
+import { evolve, literal, method, param, propertiesOf, remote, serverHost, sessionHost } from "@p2/app/v1";
 import { AskOwner, CompleteCard, LocationSchema, WriteCard } from "./contract.ts";
 
 /** Read the card held by the calling location session. */
@@ -52,8 +52,7 @@ const Assignment = union([
 /** The location submits a card ID. The script selector is fake-model metadata. */
 export type HomeAssignment = Static<typeof Assignment>;
 
-/** Only P2's server may send a Home notice or a card ID to a worker. */
-export const DoneHomeIngress = remote("p2.done-home-ingress", {
+const DoneHomeIngressV1 = remote("p2.done-home-ingress", {
 	version: 1,
 	params: { session: param.str() },
 	hostAddress: sessionHost,
@@ -63,6 +62,11 @@ export const DoneHomeIngress = remote("p2.done-home-ingress", {
 		},
 	},
 });
+
+/** The server can submit a notice or card ID, and wait for a free turn before moving a shared session. */
+export const DoneHomeIngress = evolve(DoneHomeIngressV1, (version) =>
+	version.addMethod("server", "idle", nul(), bool()),
+);
 
 /** Card operations are checked against the caller's actual role and card assignment. */
 export const HomeOperation = union([

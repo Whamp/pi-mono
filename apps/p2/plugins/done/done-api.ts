@@ -35,6 +35,13 @@ export type DoneEvent = {
 	data: Record<string, unknown>;
 };
 
+/** Finish every copy's inbox poll before reporting failures to Chord's routine retry. */
+export async function pollDoneCopies(polls: Promise<void>[]) {
+	const results = await Promise.allSettled(polls);
+	const failures = results.flatMap((result) => (result.status === "rejected" ? [result.reason] : []));
+	if (failures.length) throw new AggregateError(failures, "Done inbox polling failed.");
+}
+
 export class DoneApi {
 	readonly #url: URL;
 	readonly #tokenFile: string;
