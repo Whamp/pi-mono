@@ -14,6 +14,7 @@ const CopySettings = obj({
 	tokenFile: str(),
 	pattern: opt(union([literal("b"), literal("c"), literal("d-a"), literal("d-b")])),
 	p2Url: opt(str()),
+	workTimeoutMs: opt(num({ minimum: 1 })),
 	locations: opt(obj({ fleet: opt(Location), household: opt(Location), shop: opt(Location) })),
 	scripts: opt(record(str())),
 	schedule: opt(
@@ -34,6 +35,7 @@ function doneCopySettings({ id, locations, ...settings }: Static<typeof CopySett
 		...settings,
 		id: id ?? key,
 		pattern: settings.pattern ?? "b",
+		workTimeoutMs: settings.workTimeoutMs ?? 30_000,
 		locations: {
 			fleet: locations?.fleet ?? { env: "fleet", folder: "~/agents-world/fleet" },
 			household: locations?.household ?? { env: null, folder: join(homedir(), "agents-world/household") },

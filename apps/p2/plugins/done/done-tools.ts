@@ -144,6 +144,7 @@ export function createDoneTools(callCard: CallCard) {
 									card.trace(
 										{
 											step: "tool called",
+											pid: process.pid,
 											words: JSON.stringify(args),
 										},
 										ctx,

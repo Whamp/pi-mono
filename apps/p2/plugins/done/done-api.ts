@@ -14,6 +14,7 @@ export type DoneItem = {
 	created_at: string;
 	created_by: string;
 	status: string;
+	done_by?: string | null;
 	turn: string;
 	blocks: DoneBlock[];
 };
@@ -99,6 +100,10 @@ export class DoneApi {
 
 	async comment(card: string, text: string) {
 		await this.#request(`/api/items/${card}/comments`, "POST", { text });
+	}
+
+	async reopen(card: string) {
+		await this.#request(`/api/items/${card}/reopen`, "POST", {});
 	}
 
 	async complete(card: string, body: { did: string; verified: string }) {

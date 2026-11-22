@@ -18,45 +18,59 @@ export default defineFacet((host) => {
 		self.contribute(Extensions, { [tools.name]: tools, [script.name]: script });
 	});
 
-	host.serve(DoneIngress, (_params, principal, self) => {
-		if (principal.kind !== "server") throw forbidden("Only the server delivers done events.");
-		const harness = harnessOf(self);
-		const worker = workerOf(self);
-		return {
-			variant: "server",
-			members: {
-				input: async ({ card, text, requestId, first, script, until }, ctx) => {
-					const durable = harness().durable;
-					let content = text;
-					if (first) {
-						await durable.commit(async (tx) => {
-							(await tx.doc(DoneSessionDoc)).link = { card, ...(script ? { script } : {}) };
-						}, ctx);
-						content = `Done card ${card}\n${until === undefined ? "" : `Scheduled for epoch millisecond ${until}. Call done_sleep_until first.\n`}\n${text}`;
-					}
-					const conversation = await durable.conversation(await mainConversation(durable, ctx), ctx);
-					if (!conversation) throw new Error("Done session has no main conversation.");
-					await conversation.submit({ type: "input", content, requestId, whenBusy: "followUp" }, ctx);
-					return null;
+	host.serve(
+		DoneIngress,
+		(_params, principal, self) => {
+			if (principal.kind !== "server") throw forbidden("Only the server delivers done events.");
+			const harness = harnessOf(self);
+			const worker = workerOf(self);
+			return {
+				variant: "server",
+				members: {
+					idle: async (_args, ctx) => {
+						const { tasks, submissions } = await harness().durable.inspect(ctx);
+						return tasks.length === 0 && submissions.length === 0;
+					},
+					abort: async (_args, ctx) => {
+						const durable = harness().durable;
+						const conversation = await durable.conversation(await mainConversation(durable, ctx), ctx);
+						await conversation?.abort(ctx);
+						return null;
+					},
+					input: async ({ card, text, requestId, first, script, until }, ctx) => {
+						const durable = harness().durable;
+						let content = text;
+						if (first) {
+							await durable.commit(async (tx) => {
+								(await tx.doc(DoneSessionDoc)).link = { card, ...(script ? { script } : {}) };
+							}, ctx);
+							content = `Done card ${card}\n${until === undefined ? "" : `Scheduled for epoch millisecond ${until}. Call done_sleep_until first.\n`}\n${text}`;
+						}
+						const conversation = await durable.conversation(await mainConversation(durable, ctx), ctx);
+						if (!conversation) throw new Error("Done session has no main conversation.");
+						await conversation.submit({ type: "input", content, requestId, whenBusy: "followUp" }, ctx);
+						return null;
+					},
+					answer: ({ task, block, text }, ctx) =>
+						// SAFETY: this ID was recorded by ask_owner itself in this session's Durable store.
+						harness().durable.signal(task as TaskId, DoneAnswer, block, { text }, ctx),
+					wake: async () => {
+						harness().durable.resume();
+						return null;
+					},
+					parkedPid: async ({ task }, ctx) => {
+						if ((worker().liveness.value.viewers ?? 0) > 0) return null;
+						const durable = harness().durable;
+						const main = await mainConversation(durable, ctx);
+						const live = await durable.snapshot(LiveDoc, main, ctx);
+						return live?.tools?.some((slot) => slot.taskId === task && slot.status === "sleeping") &&
+							!durable.wake().active
+							? process.pid
+							: null;
+					},
 				},
-				answer: ({ task, block, text }, ctx) =>
-					// SAFETY: this ID was recorded by ask_owner itself in this session's Durable store.
-					harness().durable.signal(task as TaskId, DoneAnswer, block, { text }, ctx),
-				wake: async () => {
-					harness().durable.resume();
-					return null;
-				},
-				parkedPid: async ({ task }, ctx) => {
-					if ((worker().liveness.value.viewers ?? 0) > 0) return null;
-					const durable = harness().durable;
-					const main = await mainConversation(durable, ctx);
-					const live = await durable.snapshot(LiveDoc, main, ctx);
-					return live?.tools?.some((slot) => slot.taskId === task && slot.status === "sleeping") &&
-						!durable.wake().active
-						? process.pid
-						: null;
-				},
-			},
-		};
-	});
+			};
+		},
+		{ accepts: { 1: {} } },
+	);
 });

@@ -1,6 +1,8 @@
 // Done's server owns card links and credentials. Only the session worker opens its Durable conversation.
 import { arr, bool, int, nul, num, obj, opt, type Static, str, union } from "@earendil-works/pi-schema";
-import { literal, method, param, remote, serverHost, sessionHost } from "@p2/app/v1";
+import { evolve, literal, method, param, remote, serverHost, sessionHost } from "@p2/app/v1";
+
+import { DoneAnswerReceipt, DoneAttempt } from "./done-work.ts";
 
 export const LocationSchema = union([literal("fleet"), literal("household"), literal("shop")]);
 export type DoneLocation = Static<typeof LocationSchema>;
@@ -21,10 +23,13 @@ export const CardLink = obj({
 	session: str(),
 	location: LocationSchema,
 	park: opt(ParkReceipt),
+	attempt: opt(DoneAttempt),
+	answer: opt(DoneAnswerReceipt),
+	failed: opt(bool()),
 });
 export type DoneLink = Static<typeof CardLink>;
 
-export const TraceTool = obj({ step: str(), words: str() });
+export const TraceTool = obj({ step: str(), words: str(), pid: opt(int()) });
 
 export const CommentCard = obj({ text: str() });
 export const ResumeCard = obj({ block: str(), text: str() });
@@ -49,7 +54,7 @@ export const DoneCard = remote("p2.done-card", {
 });
 
 /** One call holds the target worker long enough to commit an input, deliver a signal, or inspect its park. */
-export const DoneIngress = remote("p2.done-ingress", {
+const DoneIngressV1 = remote("p2.done-ingress", {
 	version: 1,
 	params: { session: param.str() },
 	hostAddress: sessionHost,
@@ -73,3 +78,7 @@ export const DoneIngress = remote("p2.done-ingress", {
 		},
 	},
 });
+
+export const DoneIngress = evolve(DoneIngressV1, (version) =>
+	version.addMethod("server", "idle", obj({}), bool()).addMethod("server", "abort", obj({}), nul()),
+);

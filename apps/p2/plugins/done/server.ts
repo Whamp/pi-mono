@@ -3,6 +3,7 @@ import { appendFile } from "node:fs/promises";
 import { join } from "node:path";
 import { bool, compile, int, obj, type Static, str } from "@earendil-works/pi-schema";
 import {
+	type Context,
 	type Ctx,
 	defineFacet,
 	defineState,
@@ -14,6 +15,7 @@ import {
 	type Ref,
 	record,
 	sleep,
+	withAbortSignal,
 } from "@p2/app/v1";
 import { Hosts, Server, serverOf } from "@p2/app/v1/server";
 import { SessionOperations } from "../sessions/contract.ts";
@@ -41,6 +43,15 @@ import {
 	loadDoneSettings,
 } from "./done-settings.ts";
 
+import {
+	doneAnswerChanged,
+	doneAnswerReceipt,
+	doneFailure,
+	interruptedDoneLine,
+	returnDoneCard,
+	stoppedDoneAttempt,
+} from "./done-work.ts";
+
 const FollowerState = obj({
 	cards: record(CardLink),
 	ambiguous: record(str()),
@@ -48,13 +59,16 @@ const FollowerState = obj({
 	seen: int(),
 });
 const legacyFollower = compile(FollowerState);
+const FollowerCopies = obj({ copies: record(FollowerState) });
+const savedCopies = compile(FollowerCopies);
 const initialFollower = () => ({ cards: {}, ambiguous: {}, scheduled: {}, seen: 0 });
 
 const STATE = defineState("p2.done-links", {
-	schema: obj({ copies: record(FollowerState) }),
-	version: 2,
+	schema: FollowerCopies,
+	version: 3,
 	initial: () => ({ copies: {} }),
-	migrate: (old) => {
+	migrate: (old, from) => {
+		if (from === 2 && savedCopies.check(old)) return old;
 		if (!legacyFollower.check(old)) throw new Error("Invalid saved done card links.");
 		return { copies: { [doneCopyKey(LEGACY_DONE_COPY)]: old } };
 	},
@@ -83,6 +97,8 @@ export default defineFacet((host) => {
 		const natives = serverOf(self);
 		const sessions = self.get(SessionOperations, {});
 		const saved = self.state(STATE);
+		const epoch = crypto.randomUUID();
+		const generations = new Map<string, number>();
 		const settings = self.open(
 			() => loadDoneSettings(server.info.value.dataDir),
 			() => {},
@@ -90,7 +106,7 @@ export default defineFacet((host) => {
 		const ingress = <T>(
 			session: string,
 			run: (ref: Extract<Ref<typeof DoneIngress>, { variant: "server" }>, ctx: Ctx) => Promise<T>,
-			ctx: Ctx,
+			ctx: Context,
 		) =>
 			natives().root(
 				async (inner) => run(expectVariant(await inner.get(DoneIngress, { session }), "server"), inner),
@@ -140,6 +156,44 @@ export default defineFacet((host) => {
 				if (!linked) throw forbidden("This worker has no done card.");
 				return linked;
 			};
+			const finishAttempt = async (card: string, ctx: Ctx) => {
+				const attempt = state.value.cards[card]?.attempt;
+				await state.change((draft) => {
+					delete draft.cards[card].attempt;
+				}, ctx);
+				if (attempt) generations.delete(attempt.id);
+			};
+			const fail = async (card: string, line: string, ctx: Ctx, changed = false) => {
+				const link = state.value.cards[card];
+				await returnDoneCard(api(), card, line, changed);
+				await state.change((draft) => {
+					draft.cards[card].failed = true;
+					delete draft.cards[card].park;
+				}, ctx);
+				await finishAttempt(card, ctx);
+				await trace(card, link, "card returned", line);
+			};
+			const begin = async (card: string, ctx: Ctx, until?: number) => {
+				const id = epoch + crypto.randomUUID();
+				const session = state.value.cards[card].session;
+				await state.change((draft) => {
+					const link = draft.cards[card];
+					delete link.failed;
+					link.attempt = { id, session, deadline: Math.max(until ?? 0, Date.now()) + config.workTimeoutMs };
+				}, ctx);
+				return id;
+			};
+			const rememberWorker = (id: string, session: string) => {
+				const generation = hosts.workers.value[session]?.generation;
+				if (generation !== undefined) generations.set(id, generation);
+			};
+			const checkAnswer = async (card: string, ctx: Ctx) => {
+				const link = state.value.cards[card];
+				if (!link.failed && (await doneAnswerChanged(api(), card, link.answer))) {
+					await fail(card, doneFailure.changed, ctx, true);
+				}
+				if (state.value.cards[card].failed) throw forbidden("This work was returned to the owner.");
+			};
 			const start = async (
 				card: string,
 				location: DoneLocation,
@@ -156,17 +210,24 @@ export default defineFacet((host) => {
 					}, ctx);
 				}
 				const { env, folder } = config.locations[link.location];
-				await sessions.create(
-					{
-						id: link.session,
-						title: `${donePatternMark(config.pattern)} · ${title}`,
-						env,
-						cwd: folder,
-					},
-					ctx,
-				);
-				await trace(card, link, "session started", input.text);
-				await ingress(link.session, (worker, inner) => worker.input({ card, first: true, ...input }, inner), ctx);
+				const id = await begin(card, ctx, input.until);
+				const bounded = withAbortSignal(AbortSignal.timeout(config.workTimeoutMs), ctx);
+				try {
+					await sessions.create(
+						{ id: link.session, title: `${donePatternMark(config.pattern)} · ${title}`, env, cwd: folder },
+						bounded,
+					);
+					await trace(card, link, "session started", input.text);
+					await ingress(
+						link.session,
+						(worker, inner) => worker.input({ card, first: true, ...input }, inner),
+						bounded,
+					);
+					rememberWorker(id, link.session);
+				} catch (error) {
+					await trace(card, link, "session failed", String(error));
+					await fail(card, env ? doneFailure.unavailable(link.location) : doneFailure.interrupted, ctx);
+				}
 			};
 
 			const accept = async (event: DoneEvent, ctx: Ctx) => {
@@ -227,30 +288,42 @@ export default defineFacet((host) => {
 					return;
 				}
 				if (!link) return;
+				const receipt = doneAnswerReceipt(event);
 				const park = link.park;
-				if (park?.kind === "question" && answer !== undefined && data.block_id === park.block) {
-					const result = await ingress(
-						link.session,
-						(worker, inner) =>
-							worker.answer(
-								{
-									task: park.task,
-									block: park.block,
-									text: answer,
-								},
-								inner,
-							),
-						ctx,
-					);
-					if (result !== "delivered" && result !== "duplicate" && result !== "closed")
-						throw new Error(`done answer for ${card}/${park.block}: ${result}`);
-					if (result === "delivered")
-						await trace(card, link, "answer delivered", answer, { eventAt: event.at, task: park.task });
+				if (receipt && park?.kind === "question" && receipt.block === park.block) {
+					if (await doneAnswerChanged(api(), card, receipt)) {
+						await fail(card, doneFailure.changed, ctx, true);
+						return;
+					}
+					const id = await begin(card, ctx);
 					await state.change((draft) => {
-						if (draft.cards[card]?.park?.task === park.task) delete draft.cards[card].park;
+						draft.cards[card].answer = receipt;
+						delete draft.cards[card].park;
 					}, ctx);
+					try {
+						const result = await ingress(
+							link.session,
+							(worker, inner) =>
+								worker.answer({ task: park.task, block: park.block, text: receipt.text }, inner),
+							withAbortSignal(AbortSignal.timeout(config.workTimeoutMs), ctx),
+						);
+						rememberWorker(id, link.session);
+						if (result === "delivered" || result === "duplicate") {
+							await trace(card, link, "answer delivered", receipt.text, { eventAt: event.at, task: park.task });
+						} else {
+							await fail(card, doneFailure.interrupted, ctx);
+						}
+					} catch (error) {
+						await trace(card, link, "session failed", String(error));
+						await fail(card, doneFailure.interrupted, ctx);
+					}
 					return;
 				}
+				if (receipt && link.answer?.block === receipt.block) {
+					if (link.answer.text !== receipt.text) await fail(card, doneFailure.changed, ctx, true);
+					return;
+				}
+				if (receipt && link.failed) return;
 				const text =
 					answer ??
 					(typeof data.note === "string"
@@ -299,32 +372,88 @@ export default defineFacet((host) => {
 				}, ctx);
 			};
 
-			const parkedWorkers = async (ctx: Ctx) => {
+			const watchWorkers = async (ctx: Ctx) => {
 				for (const [card, link] of Object.entries(state.value.cards)) {
-					const park = link.park;
-					if (!park) continue;
-					if (park.kind === "timer" && park.until <= Date.now()) {
+					const { park, attempt, session } = link;
+					const worker = hosts.workers.value[session];
+					if (attempt && stoppedDoneAttempt(attempt, epoch, worker, generations.get(attempt.id))) {
+						// A parked tool is safe to reopen and inspect. Only its own Durable receipt proves it can wait.
+						if (park) {
+							try {
+								const pid = await ingress(
+									session,
+									(worker, inner) => worker.parkedPid({ task: park.task }, inner),
+									withAbortSignal(AbortSignal.timeout(5_000), ctx),
+								);
+								if (pid !== null) {
+									await finishAttempt(card, ctx);
+									await natives().workers.stop(session);
+									await trace(card, link, "parked worker stopped", "", {
+										pid,
+										task: park.task,
+										kind: park.kind,
+									});
+									continue;
+								}
+							} catch (error) {
+								await trace(card, link, "could not restore parked work", String(error));
+							}
+						}
+						const line =
+							park?.kind === "question"
+								? "The session stopped while posting its question. I could not resume it. Check the card before asking me to retry."
+								: interruptedDoneLine(attempt);
+						await fail(card, line, ctx);
+						continue;
+					}
+					if (park?.kind === "timer" && park.until <= Date.now()) {
+						const id = await begin(card, ctx);
 						await trace(card, link, "timer due", "", { until: park.until });
-						await ingress(link.session, (worker, inner) => worker.wake(inner), ctx);
+						await ingress(session, (worker, inner) => worker.wake(inner), ctx);
+						rememberWorker(id, session);
 						await state.change((draft) => {
 							if (draft.cards[card]?.park?.task === park.task) delete draft.cards[card].park;
 						}, ctx);
-					} else if (hosts.workers.value[link.session]?.running) {
+					} else if (park && worker?.running) {
 						const pid = await ingress(
-							link.session,
+							session,
 							(worker, inner) => worker.parkedPid({ task: park.task }, inner),
 							ctx,
 						);
-						if (pid === null) continue;
-						await natives().workers.stop(link.session);
-						await trace(card, link, "parked worker stopped", "", { pid, task: park.task, kind: park.kind });
+						if (pid !== null) {
+							if (attempt) await finishAttempt(card, ctx);
+							await natives().workers.stop(session);
+							await trace(card, link, "parked worker stopped", "", { pid, task: park.task, kind: park.kind });
+							continue;
+						}
+					}
+					if (!attempt) continue;
+					const item = await api().item(card);
+					if (item.status !== "open") {
+						await finishAttempt(card, ctx);
+					} else if (attempt.deadline <= Date.now()) {
+						const line = doneFailure.timeout;
+						await fail(card, line, ctx);
+						if (worker?.running) {
+							await ingress(
+								session,
+								(worker, inner) => worker.abort({}, inner),
+								withAbortSignal(AbortSignal.timeout(5_000), ctx),
+							);
+						}
+					} else if (
+						!park &&
+						worker?.running &&
+						(await ingress(session, (worker, inner) => worker.idle({}, inner), ctx))
+					) {
+						await fail(card, doneFailure.silent, ctx);
 					}
 				}
 			};
 
 			const pollInbox = async (ctx: Ctx) => {
 				await arm(ctx);
-				await parkedWorkers(ctx);
+				await watchWorkers(ctx);
 				for (const event of await api().inbox()) {
 					if (event.seq > state.value.seen) {
 						await accept(event, ctx);
@@ -338,8 +467,9 @@ export default defineFacet((host) => {
 
 			return {
 				pollInbox,
-				write: async ({ session, body }: { session: string; body: Static<typeof WriteCard> }) => {
+				write: async ({ session, body }: { session: string; body: Static<typeof WriteCard> }, ctx: Ctx) => {
 					const [card, link] = forSession(session);
+					await checkAnswer(card, ctx);
 					const item = await api().item(card);
 					const facts = { id: "done-facts", type: "facts", rows: body.facts };
 					await api().patch(card, {
@@ -350,20 +480,25 @@ export default defineFacet((host) => {
 					await trace(card, link, "tool ran", JSON.stringify(body), { tool: "done_write" });
 					return null;
 				},
-				comment: async ({ session, body }: { session: string; body: Static<typeof CommentCard> }) => {
+				comment: async ({ session, body }: { session: string; body: Static<typeof CommentCard> }, ctx: Ctx) => {
 					const [card, link] = forSession(session);
+					await checkAnswer(card, ctx);
 					await api().comment(card, body.text);
 					await trace(card, link, "tool ran", body.text, { tool: "done_comment" });
 					return null;
 				},
-				complete: async ({ session, body }: { session: string; body: Static<typeof CompleteCard> }) => {
+				complete: async ({ session, body }: { session: string; body: Static<typeof CompleteCard> }, ctx: Ctx) => {
 					const [card, link] = forSession(session);
+					await checkAnswer(card, ctx);
 					await api().complete(card, body);
+					await checkAnswer(card, ctx);
+					await finishAttempt(card, ctx);
 					await trace(card, link, "tool ran", JSON.stringify(body), { tool: "done_complete" });
 					return null;
 				},
 				park: async ({ session, body }: { session: string; body: Static<typeof Park> }, ctx: Ctx) => {
 					const [card, link] = forSession(session);
+					await checkAnswer(card, ctx);
 					if (body.kind === "timer") {
 						await state.change((draft) => {
 							draft.cards[card].park = body;
@@ -372,19 +507,21 @@ export default defineFacet((host) => {
 						return "";
 					}
 					const block = `done-question-${body.task}`;
+					await state.change((draft) => {
+						draft.cards[card].park = { kind: "question", task: body.task, block };
+						delete draft.cards[card].answer;
+					}, ctx);
 					await putDoneQuestion(api(), card, {
 						id: block,
 						prompt: body.prompt,
 						...(body.options ? { options: body.options } : {}),
 					});
-					await state.change((draft) => {
-						draft.cards[card].park = { kind: "question", task: body.task, block };
-					}, ctx);
 					await trace(card, link, "question parked", body.prompt, { task: body.task, block });
 					return block;
 				},
-				resumed: async ({ session, body }: { session: string; body: Static<typeof ResumeCard> }) => {
+				resumed: async ({ session, body }: { session: string; body: Static<typeof ResumeCard> }, ctx: Ctx) => {
 					const [card, link] = forSession(session);
+					await checkAnswer(card, ctx);
 					const item = await api().item(card);
 					if (
 						item.status === "open" &&
@@ -395,9 +532,19 @@ export default defineFacet((host) => {
 					await trace(card, link, "tool ran", body.text, { tool: "ask_owner", block: body.block });
 					return null;
 				},
-				trace: async ({ session, body }: { session: string; body: Static<typeof TraceTool> }) => {
+				trace: async ({ session, body }: { session: string; body: Static<typeof TraceTool> }, ctx: Ctx) => {
 					const [card, link] = forSession(session);
-					await trace(card, link, body.step, body.words);
+					if (body.step === "tool called") {
+						await checkAnswer(card, ctx);
+						await state.change((draft) => {
+							const attempt = draft.cards[card].attempt;
+							if (attempt) {
+								attempt.attempted = `a command in the ${link.location} location`;
+								if (body.pid !== undefined) attempt.pid = body.pid;
+							}
+						}, ctx);
+					}
+					await trace(card, link, body.step, body.words, { pid: body.pid });
 					return null;
 				},
 			};
@@ -421,12 +568,12 @@ export default defineFacet((host) => {
 		});
 
 		return {
-			write: (args) => forSession(args.session).write(args),
-			comment: (args) => forSession(args.session).comment(args),
-			complete: (args) => forSession(args.session).complete(args),
+			write: (args, ctx) => forSession(args.session).write(args, ctx),
+			comment: (args, ctx) => forSession(args.session).comment(args, ctx),
+			complete: (args, ctx) => forSession(args.session).complete(args, ctx),
 			park: (args, ctx) => forSession(args.session).park(args, ctx),
-			resumed: (args) => forSession(args.session).resumed(args),
-			trace: (args) => forSession(args.session).trace(args),
+			resumed: (args, ctx) => forSession(args.session).resumed(args, ctx),
+			trace: (args, ctx) => forSession(args.session).trace(args, ctx),
 		};
 	});
 

@@ -2,7 +2,18 @@
 import { appendFile } from "node:fs/promises";
 import { join } from "node:path";
 import { obj, str } from "@earendil-works/pi-schema";
-import { type Ctx, expectVariant, type FacetHost, forbidden, isWorker, local, method, sleep } from "@p2/app/v1";
+import {
+	type Context,
+	type Ctx,
+	expectVariant,
+	type FacetHost,
+	forbidden,
+	isWorker,
+	local,
+	method,
+	sleep,
+	withAbortSignal,
+} from "@p2/app/v1";
 import { Hosts, Server, serverOf, WorkerInitValues } from "@p2/app/v1/server";
 import { FamiliarStore } from "../familiar/contract.ts";
 import { SessionMoves, SessionOperations } from "../sessions/contract.ts";
@@ -26,6 +37,15 @@ import {
 	LEGACY_DONE_COPY,
 	loadDoneSettings,
 } from "./done-settings.ts";
+
+import {
+	doneAnswerChanged,
+	doneAnswerReceipt,
+	doneFailure,
+	interruptedDoneLine,
+	returnDoneCard,
+	stoppedDoneAttempt,
+} from "./done-work.ts";
 
 const HomeService = local("p2.done-home-service", {
 	version: 1,
@@ -54,6 +74,8 @@ export function registerDoneHome(host: FacetHost) {
 		const sessions = self.get(SessionOperations, {});
 		const moves = self.get(SessionMoves, {});
 		const saved = self.state(HomeState);
+		const epoch = crypto.randomUUID();
+		const generations = new Map<string, number>();
 		const settings = self.open(
 			() => loadDoneSettings(server.info.value.dataDir),
 			() => {},
@@ -129,17 +151,104 @@ export function registerDoneHome(host: FacetHost) {
 					{ mode: 0o600 },
 				);
 			};
-			const submit = (session: string, body: HomeAssignment, ctx: Ctx) =>
-				natives().root(async (inner) => {
-					const ingress = expectVariant(await inner.get(DoneHomeIngress, { session }), "server");
-					await ingress.submit(body, inner);
+			const begin = async (card: string, session: string | undefined, ctx: Ctx) => {
+				const previous = state.value.cards[card].attempt;
+				if (previous) generations.delete(previous.id);
+				const id = epoch + crypto.randomUUID();
+				await state.change((draft) => {
+					draft.cards[card].attempt = {
+						id,
+						deadline: Date.now() + config.workTimeoutMs,
+						...(session ? { session } : {}),
+					};
 				}, ctx);
+				return id;
+			};
+			const finish = async (card: string, ctx: Ctx) => {
+				const attempt = state.value.cards[card].attempt;
+				if (!attempt) return;
+				await state.change((draft) => {
+					delete draft.cards[card].attempt;
+				}, ctx);
+				generations.delete(attempt.id);
+			};
+			const fail = async (card: string, line: string, ctx: Ctx, changed = false) => {
+				const link = state.value.cards[card];
+				await returnDoneCard(api("Home"), link.target ?? card, line, changed);
+				await state.change((draft) => {
+					draft.cards[card].state = "failed";
+					for (const [id, pending] of Object.entries(draft.dispatches)) {
+						if (pending.card === card) delete draft.dispatches[id];
+					}
+					for (const [id, pending] of Object.entries(draft.outbox)) {
+						if (pending.card === card) delete draft.outbox[id];
+					}
+					for (const [id, pending] of Object.entries(draft.reports)) {
+						if (pending.card === card) delete draft.reports[id];
+					}
+				}, ctx);
+				await finish(card, ctx);
+				await trace(card, "card returned", { words: line });
+			};
+			const checkAnswer = async (card: string, ctx: Ctx) => {
+				const link = state.value.cards[card];
+				if (link.state !== "failed" && (await doneAnswerChanged(api(), link.target ?? card, link.answer))) {
+					await fail(card, doneFailure.changed, ctx, true);
+				}
+				if (state.value.cards[card].state === "failed") throw forbidden("This work was returned to the owner.");
+			};
+			const workerIngress = <T>(
+				session: string,
+				action: (ref: Awaited<ReturnType<typeof getIngress>>, ctx: Ctx) => Promise<T>,
+				ctx: Context,
+			) => natives().root(async (inner) => action(await getIngress(session, inner), inner), ctx);
+			async function getIngress(session: string, ctx: Ctx) {
+				return expectVariant(await ctx.get(DoneHomeIngress, { session }), "server");
+			}
+			const submit = async (session: string, body: HomeAssignment, ctx: Ctx) =>
+				workerIngress(
+					session,
+					(worker, inner) => worker.submit(body, inner),
+					withAbortSignal(AbortSignal.timeout(config.workTimeoutMs), ctx),
+				);
+
+			const watchAttempts = async (ctx: Ctx) => {
+				for (const [card, link] of Object.entries(state.value.cards)) {
+					const { attempt } = link;
+					if (!attempt) continue;
+					const { session } = attempt;
+					const worker = session ? hosts.workers.value[session] : undefined;
+					if (stoppedDoneAttempt(attempt, epoch, worker, generations.get(attempt.id))) {
+						await fail(card, interruptedDoneLine(attempt), ctx);
+					} else if (attempt.deadline <= Date.now()) {
+						await fail(card, doneFailure.timeout, ctx);
+						if (session && worker?.running) {
+							await workerIngress(
+								session,
+								(ref, inner) => ref.abort({}, inner),
+								withAbortSignal(AbortSignal.timeout(5_000), ctx),
+							);
+						}
+					} else if (
+						session &&
+						worker?.running &&
+						generations.has(attempt.id) &&
+						(await workerIngress(session, (ref, inner) => ref.idle({}, inner), ctx)) &&
+						state.value.cards[card].attempt?.id === attempt.id
+					) {
+						await fail(card, doneFailure.silent, ctx);
+					}
+				}
+			};
+			const rememberWorker = (id: string, session: string) => {
+				const generation = hosts.workers.value[session]?.generation;
+				if (generation !== undefined) generations.set(id, generation);
+			};
 			const roamingIdle = (ctx: Ctx) => {
 				const session = state.value.mainSession;
 				if (!session || !hosts.workers.value[session]?.running) return Promise.resolve(true);
 				return natives().root(
-					async (inner) =>
-						expectVariant(await inner.get(DoneHomeIngress, { session }), "server").idle(null, inner),
+					async (inner) => expectVariant(await inner.get(DoneHomeIngress, { session }), "server").idle({}, inner),
 					ctx,
 				);
 			};
@@ -152,15 +261,17 @@ export function registerDoneHome(host: FacetHost) {
 					else draft.locations[location] = session;
 				}, ctx);
 				const { env, folder } = config.locations[location];
+				const bounded = withAbortSignal(AbortSignal.timeout(config.workTimeoutMs), ctx);
 				const label = roaming ? "Done" : location;
 				await sessions.create(
 					{ id: session, title: `${donePatternMark(config.pattern)} · ${label}`, env, cwd: folder },
-					ctx,
+					bounded,
 				);
 				if (roaming && state.value.sessionLocation !== location) {
 					const from = state.value.sessionLocation;
 					// The location tool uses this same P2 relocation. Its fence waits for the source turn to finish.
-					if (from && (await moves.relocate({ id: session, env, cwd: folder }, ctx)).refused !== null) return null;
+					if (from && (await moves.relocate({ id: session, env, cwd: folder }, bounded)).refused !== null)
+						return null;
 					await state.change((draft) => {
 						draft.sessionLocation = location;
 					}, ctx);
@@ -177,6 +288,16 @@ export function registerDoneHome(host: FacetHost) {
 				const card = Object.entries(state.value.cards).find(([, link]) => link.target === id)?.[0] ?? id;
 				const link = state.value.cards[card];
 				const words = ownerWords(event);
+				const receipt = doneAnswerReceipt(event);
+				if (receipt && link?.answer?.block === receipt.block) {
+					if (link.answer.text !== receipt.text) await fail(card, doneFailure.changed, ctx, true);
+					return;
+				}
+				if (receipt && link?.state === "failed") return;
+				if (receipt && (await doneAnswerChanged(api(), id, receipt))) {
+					if (link) await fail(card, doneFailure.changed, ctx, true);
+					return;
+				}
 				if (
 					roaming &&
 					link?.waitingBlock &&
@@ -227,6 +348,8 @@ export function registerDoneHome(host: FacetHost) {
 					const current = draft.cards[card];
 					current.event = event.seq;
 					current.eventCard = id;
+					if (receipt && link?.waitingBlock === receipt.block) current.answer = receipt;
+					if (current.state === "failed") delete current.state;
 					if (script) {
 						current.script = script;
 					}
@@ -257,7 +380,17 @@ export function registerDoneHome(host: FacetHost) {
 			const flush = async (ctx: Ctx) => {
 				for (const [key, notice] of Object.entries(state.value.outbox)) {
 					const id = await openHome(ctx);
-					await submit(id, { kind: "home", notice, requestId: `done-home:${key}` }, ctx);
+					if (!state.value.outbox[key]) continue;
+					const attempt = notice.kind === "state" ? undefined : await begin(notice.card, id, ctx);
+					try {
+						await submit(id, { kind: "home", notice, requestId: `done-home:${key}` }, ctx);
+						if (attempt) rememberWorker(attempt, id);
+					} catch (error) {
+						if (!attempt) throw error;
+						await trace(notice.card, "session failed", { words: String(error) });
+						await fail(notice.card, doneFailure.interrupted, ctx);
+						continue;
+					}
 					await trace(notice.card, "Home notice", { session: id, location: "Home", notice });
 					await state.change((draft) => {
 						delete draft.outbox[key];
@@ -338,18 +471,37 @@ export function registerDoneHome(host: FacetHost) {
 						draft.cards[card].asking = true;
 						delete draft.dispatches[notice];
 					}, ctx);
+					await finish(card, ctx);
 					await trace(card, "location asked");
 					return "Asked the owner for the location.";
 				}
-				const session = await sessionAtLocation(location, card, ctx);
+				// Put the failure or result on the follow-up even if the destination never starts.
+				const target =
+					pending.transfer && !link.target && (await api().item(card)).status === "done"
+						? await followUp(card, location)
+						: link.target;
+				if (target && target !== link.target) {
+					await state.change((draft) => {
+						draft.cards[card].target = target;
+					}, ctx);
+				}
+				let session: string | null;
+				try {
+					session = await sessionAtLocation(location, card, ctx);
+				} catch (error) {
+					await trace(card, "session failed", { words: String(error) });
+					await fail(
+						card,
+						config.locations[location].env ? doneFailure.unavailable(location) : doneFailure.interrupted,
+						ctx,
+					);
+					return "Returned the card to the owner.";
+				}
 				if (!session) return "The session is still working.";
 				if (pending.change) {
 					await directLink(card, session, pending.change, ctx);
+					await finish(card, ctx);
 				} else {
-					const target =
-						pending.transfer && !link.target && (await api().item(card)).status === "done"
-							? await followUp(card, location)
-							: link.target;
 					await state.change((draft) => {
 						const current = draft.cards[card];
 						current.location = location;
@@ -357,9 +509,6 @@ export function registerDoneHome(host: FacetHost) {
 						current.asking = false;
 						delete current.waitingBlock;
 						if (roaming) draft.activeCard = card;
-						if (target) {
-							current.target = target;
-						}
 					}, ctx);
 					if (link.asking || (roaming && link.state === "waiting")) {
 						const id = link.eventCard ?? card;
@@ -381,11 +530,23 @@ export function registerDoneHome(host: FacetHost) {
 							words: card,
 							retellings: 0,
 						});
-					await submit(
-						session,
-						{ kind: "location", card, requestId: `done-work:${notice}`, ...(script ? { script } : {}) },
-						ctx,
-					);
+					const attempt = await begin(card, session, ctx);
+					try {
+						await submit(
+							session,
+							{ kind: "location", card, requestId: `done-work:${notice}`, ...(script ? { script } : {}) },
+							ctx,
+						);
+						rememberWorker(attempt, session);
+					} catch (error) {
+						await trace(card, "session failed", { words: String(error) });
+						await fail(
+							card,
+							config.locations[location].env ? doneFailure.unavailable(location) : doneFailure.interrupted,
+							ctx,
+						);
+						return "Returned the card to the owner.";
+					}
 				}
 				await state.change((draft) => {
 					delete draft.dispatches[notice];
@@ -394,6 +555,7 @@ export function registerDoneHome(host: FacetHost) {
 			};
 
 			const pollInbox = async (ctx: Ctx) => {
+				await watchAttempts(ctx);
 				await schedule(ctx);
 				const events = await api().inbox();
 				const nextDispatch = () => Object.entries(state.value.dispatches)[0];
@@ -423,8 +585,13 @@ export function registerDoneHome(host: FacetHost) {
 						case "dispatch":
 							requireHome(session);
 							return dispatch(body, ctx);
+						case "continue":
+							requireLocation(session, body.card);
+							await checkAnswer(body.card, ctx);
+							return "";
 						case "read": {
 							const { card } = body;
+							await checkAnswer(card, ctx);
 							const link = requireLocation(session, card);
 							const { item, thread } = await api().detail(card);
 							const event =
@@ -456,6 +623,7 @@ export function registerDoneHome(host: FacetHost) {
 						case "update": {
 							const { card } = body;
 							const link = requireLocation(session, card);
+							await checkAnswer(card, ctx);
 							if (movePending(card)) throw forbidden("This card is between locations.");
 							const result = body.complete
 								? "settled"
@@ -469,12 +637,16 @@ export function registerDoneHome(host: FacetHost) {
 							const version = state.value.serial + 1;
 							if (direct) {
 								await publishHomeUpdate(api(link.location), link.target ?? card, body, version);
+								if (body.complete) await checkAnswer(card, ctx);
 							}
 							if (roaming) {
 								await state.change((draft) => {
 									draft.serial = version;
 									draft.cards[card].state = result;
-									if (body.question) draft.cards[card].waitingBlock = `done-question-${version}`;
+									if (body.question) {
+										draft.cards[card].waitingBlock = `done-question-${version}`;
+										delete draft.cards[card].answer;
+									}
 								}, ctx);
 							} else if (!direct || link.state !== result) {
 								await state.change((draft) => {
@@ -483,6 +655,10 @@ export function registerDoneHome(host: FacetHost) {
 										? { kind: "state", card, state: result }
 										: { kind: "publish", card, notice };
 									draft.cards[card].state = result;
+									if (body.question) {
+										draft.cards[card].waitingBlock = `done-question-${notice}`;
+										delete draft.cards[card].answer;
+									}
 									draft.outbox[notice] = message;
 									if (!direct) {
 										draft.reports[notice] = {
@@ -496,6 +672,7 @@ export function registerDoneHome(host: FacetHost) {
 									}
 								}, ctx);
 							}
+							if (result !== "working") await finish(card, ctx);
 							await trace(card, direct ? "location published" : "report ready", {
 								target: link.target ?? card,
 								state: result,
@@ -511,6 +688,7 @@ export function registerDoneHome(host: FacetHost) {
 								await state.change((draft) => {
 									enqueueDispatch(draft, { card, location, transfer: true });
 								}, ctx);
+								await finish(card, ctx);
 								await trace(card, "session move requested", { from: link.location, to: location, reason });
 								return "End the turn. This conversation continues after the location changes.";
 							}
@@ -523,6 +701,7 @@ export function registerDoneHome(host: FacetHost) {
 								draft.cards[card].transferred = true;
 								enqueueDispatch(draft, { card, location, transfer: true }, detail);
 							}, ctx);
+							await finish(card, ctx);
 							await trace(card, "hand-over", {
 								from: link.location,
 								to: "Home",
@@ -551,7 +730,10 @@ export function registerDoneHome(host: FacetHost) {
 								return "This report is closed.";
 							}
 							const target = state.value.cards[card]?.target ?? card;
+							await checkAnswer(card, ctx);
 							await publishHomeUpdate(api("Home"), target, update, notice, summary);
+							if (update.complete) await checkAnswer(card, ctx);
+							await finish(card, ctx);
 							await state.change((draft) => {
 								delete draft.reports[notice];
 							}, ctx);
@@ -560,6 +742,15 @@ export function registerDoneHome(host: FacetHost) {
 						}
 						case "trace": {
 							const { card, step, words, pid } = body;
+							if (card && step === "tool called") {
+								await state.change((draft) => {
+									const route = draft.cards[card];
+									if (route?.attempt) {
+										route.attempt.attempted = `a command in the ${route.location} location`;
+										route.attempt.pid = pid;
+									}
+								}, ctx);
+							}
 							if (roaming) {
 								await trace(card ?? state.value.activeCard, step, { session, words, pid });
 								return "";

@@ -64,8 +64,10 @@ const DoneHomeIngressV1 = remote("p2.done-home-ingress", {
 });
 
 /** The server can submit a notice or card ID, and wait for a free turn before moving a shared session. */
-export const DoneHomeIngress = evolve(DoneHomeIngressV1, (version) =>
-	version.addMethod("server", "idle", nul(), bool()),
+const DoneHomeIngressV2 = evolve(DoneHomeIngressV1, (version) => version.addMethod("server", "idle", obj({}), bool()));
+
+export const DoneHomeIngress = evolve(DoneHomeIngressV2, (version) =>
+	version.addMethod("server", "abort", obj({}), nul()),
 );
 
 /** Card operations are checked against the caller's actual role and card assignment. */
@@ -76,6 +78,7 @@ export const HomeOperation = union([
 	obj({ kind: literal("transfer"), ...propertiesOf(Transfer) }),
 	obj({ kind: literal("report"), ...propertiesOf(Publish) }),
 	obj({ kind: literal("publish"), ...propertiesOf(Publish) }),
+	obj({ kind: literal("continue"), card: str() }),
 	obj({ kind: literal("trace"), card: opt(str()), step: str(), words: str(), pid: int() }),
 ]);
 

@@ -5,6 +5,8 @@ import { LocationSchema } from "./contract.ts";
 import { Notice, Update } from "./done-home-contract.ts";
 import { doneCopyKey, LEGACY_DONE_COPY } from "./done-settings.ts";
 
+import { DoneAnswerReceipt, DoneAttempt } from "./done-work.ts";
+
 const CardRoute = obj({
 	location: opt(LocationSchema),
 	target: opt(str()),
@@ -16,6 +18,8 @@ const CardRoute = obj({
 	waitingBlock: opt(str()),
 	state: opt(str()),
 	script: opt(str()),
+	attempt: opt(DoneAttempt),
+	answer: opt(DoneAnswerReceipt),
 });
 
 const Dispatch = obj({
@@ -44,6 +48,9 @@ const HomeCopySchema = obj({
 	sessionLocation: opt(LocationSchema),
 });
 
+const HomeCopies = obj({ copies: record(HomeCopySchema) });
+const savedCopies = compile(HomeCopies);
+
 /** Routing, session IDs and pending work for a single copy. */
 export type DoneHomeCopy = Static<typeof HomeCopySchema>;
 
@@ -60,10 +67,11 @@ export const initialDoneHomeCopy = (): DoneHomeCopy => ({
 
 /** Durable routing, session assignments, and undelivered notices owned by Home. */
 export const HomeState = defineState("p2.done-home", {
-	schema: obj({ copies: record(HomeCopySchema) }),
-	version: 2,
+	schema: HomeCopies,
+	version: 3,
 	initial: () => ({ copies: {} }),
-	migrate: (old) => {
+	migrate: (old, from) => {
+		if (from === 2 && savedCopies.check(old)) return old;
 		if (!legacyHome.check(old)) throw new Error("Invalid saved done Home state.");
 		return { copies: { [doneCopyKey(LEGACY_DONE_COPY)]: { ...old, legacyFamiliar: old.serial > 0 } } };
 	},

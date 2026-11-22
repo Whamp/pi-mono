@@ -49,6 +49,7 @@ export function registerDoneHomeWorker(host: FacetHost) {
 			return;
 		}
 		const config = self.registry(HarnessConfig);
+		let activeCard: string | undefined;
 		const call = (operation: HomeOperation, context: Context) =>
 			worker().root(
 				async (ctx) => expectVariant(await ctx.get(DoneHomeCard, {}), "worker").run(operation, ctx),
@@ -70,7 +71,9 @@ export function registerDoneHomeWorker(host: FacetHost) {
 				locked: "never",
 				executionMode: "sequential",
 				async execute(args, _api, context) {
-					const text = await call(operation(args), context);
+					const request = operation(args);
+					const text = await call(request, context);
+					if (request.kind === "read") activeCard = request.card;
 					return { output: [{ type: "text", text }] };
 				},
 			});
@@ -201,7 +204,8 @@ export function registerDoneHomeWorker(host: FacetHost) {
 								wrap: (bash) => ({
 									...bash,
 									async execute(args, api, context) {
-										await log("tool called", JSON.stringify(args), context);
+										if (activeCard) await call({ kind: "continue", card: activeCard }, context);
+										await log("tool called", JSON.stringify(args), context, activeCard);
 										return bash.execute(args, api, context);
 									},
 								}),
@@ -223,6 +227,12 @@ export function registerDoneHomeWorker(host: FacetHost) {
 			return {
 				variant: "server",
 				members: {
+					abort: async (_args, ctx) => {
+						const durable = harness().durable;
+						const conversation = await durable.conversation(await mainConversation(durable, ctx), ctx);
+						await conversation?.abort(ctx);
+						return null;
+					},
 					idle: async (_args, ctx) => {
 						const { tasks, submissions } = await harness().durable.inspect(ctx);
 						return tasks.length === 0 && submissions.length === 0;
@@ -260,6 +270,6 @@ export function registerDoneHomeWorker(host: FacetHost) {
 				},
 			};
 		},
-		{ accepts: { 1: {} } },
+		{ accepts: { 1: {}, 2: {} } },
 	);
 }
