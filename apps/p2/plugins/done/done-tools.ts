@@ -114,6 +114,18 @@ export function createDoneTools(callCard: CallCard) {
 		],
 		hooks: [
 			hook(GenerationTask, {
+				async beforeRequest({ messages }, api, context) {
+					if (!(await api.snapshot(DoneSessionDoc, context))?.link) return;
+					await callCard(
+						(card, ctx) => card.trace({ step: "model called", words: "", pid: process.pid }, ctx),
+						context,
+					);
+					if (process.env.AW_JUDGE_TRACE === "1") {
+						const words = JSON.stringify(messages.filter(({ role }) => role === "user" || role === "toolResult"));
+						await callCard((card, ctx) => card.trace({ step: "model inputs", words }, ctx), context);
+					}
+					return undefined;
+				},
 				async afterResponse(message, api, context) {
 					if (!(await api.snapshot(DoneSessionDoc, context))?.link) return;
 					await callCard(
@@ -130,48 +142,49 @@ export function createDoneTools(callCard: CallCard) {
 				},
 			}),
 		],
-		wraps: [
-			{
-				kind: "tool",
-				tool: "bash",
-				wrap: (tool) => ({
-					...tool,
-					async execute(args, api, context) {
-						const link = (await api.snapshot(DoneSessionDoc, context))?.link;
-						if (link)
-							await callCard(
-								(card, ctx) =>
-									card.trace(
-										{
-											step: "tool called",
-											pid: process.pid,
-											words: JSON.stringify(args),
-										},
-										ctx,
-									),
-								context,
-							);
-						const result = await tool.execute(args, api, context);
-						if (link && result.kind === undefined)
-							await callCard(
-								(card, ctx) =>
-									card.trace(
-										{
-											step: "tool ran",
-											words: JSON.stringify({
-												tool: "bash",
-												args,
-												output: result.output ?? api.retainedOutput().text,
-											}),
-										},
-										ctx,
-									),
-								context,
-							);
-						return result;
-					},
-				}),
-			},
-		],
+		wraps: ["bash", "read", "edit", "write"].map((name) => ({
+			kind: "tool",
+			tool: name,
+			wrap: (tool) => ({
+				...tool,
+				async execute(args, api, context) {
+					const link = (await api.snapshot(DoneSessionDoc, context))?.link;
+					const observe = link && (name === "bash" || process.env.AW_JUDGE_TRACE === "1");
+					if (observe)
+						await callCard(
+							(card, ctx) =>
+								card.trace(
+									{
+										step: name === "bash" ? "tool called" : "location tool called",
+										tool: name,
+										pid: process.pid,
+										words: JSON.stringify(args),
+									},
+									ctx,
+								),
+							context,
+						);
+					const result = await tool.execute(args, api, context);
+					if (observe && result.kind === undefined)
+						await callCard(
+							(card, ctx) =>
+								card.trace(
+									{
+										step: "tool ran",
+										tool: name,
+										words: JSON.stringify({
+											tool: name,
+											args,
+											output: result.output ?? api.retainedOutput().text,
+										}),
+									},
+									ctx,
+								),
+							context,
+						);
+					return result;
+				},
+			}),
+		})),
 	});
 }

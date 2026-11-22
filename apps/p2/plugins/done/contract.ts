@@ -29,7 +29,7 @@ export const CardLink = obj({
 });
 export type DoneLink = Static<typeof CardLink>;
 
-export const TraceTool = obj({ step: str(), words: str(), pid: opt(int()) });
+export const TraceTool = obj({ step: str(), words: str(), tool: opt(str()), pid: opt(int()) });
 
 export const CommentCard = obj({ text: str() });
 export const ResumeCard = obj({ block: str(), text: str() });

@@ -544,7 +544,7 @@ export default defineFacet((host) => {
 							}
 						}, ctx);
 					}
-					await trace(card, link, body.step, body.words, { pid: body.pid });
+					await trace(card, link, body.step, body.words, { pid: body.pid, tool: body.tool });
 					return null;
 				},
 			};

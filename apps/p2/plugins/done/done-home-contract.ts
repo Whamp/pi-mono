@@ -79,7 +79,7 @@ export const HomeOperation = union([
 	obj({ kind: literal("report"), ...propertiesOf(Publish) }),
 	obj({ kind: literal("publish"), ...propertiesOf(Publish) }),
 	obj({ kind: literal("continue"), card: str() }),
-	obj({ kind: literal("trace"), card: opt(str()), step: str(), words: str(), pid: int() }),
+	obj({ kind: literal("trace"), card: opt(str()), step: str(), words: str(), tool: opt(str()), pid: int() }),
 ]);
 
 /** A typed request from a Home or location worker. */

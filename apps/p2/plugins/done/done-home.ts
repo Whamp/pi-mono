@@ -521,15 +521,6 @@ export function registerDoneHome(host: FacetHost) {
 						}
 					}
 					const script = pending.transfer && link.script ? `${link.script}-transfer` : link.script;
-					if (roaming) await trace(card, "session continues card");
-					else
-						await trace(card, "hand-over", {
-							from: "Home",
-							to: location,
-							payload: "id",
-							words: card,
-							retellings: 0,
-						});
 					const attempt = await begin(card, session, ctx);
 					try {
 						await submit(
@@ -537,6 +528,9 @@ export function registerDoneHome(host: FacetHost) {
 							{ kind: "location", card, requestId: `done-work:${notice}`, ...(script ? { script } : {}) },
 							ctx,
 						);
+						await trace(card, "location assigned", { location, session });
+						if (!roaming)
+							await trace(card, "hand-over", { from: "Home", to: location, payload: "id", words: card });
 						rememberWorker(attempt, session);
 					} catch (error) {
 						await trace(card, "session failed", { words: String(error) });
@@ -602,7 +596,7 @@ export function registerDoneHome(host: FacetHost) {
 								eventAt: event?.at,
 								words: event ? ownerWords(event) : item.origin_text,
 							});
-							return JSON.stringify({
+							const output = JSON.stringify({
 								item: {
 									...item,
 									blocks: item.blocks.map((block) => {
@@ -619,6 +613,9 @@ export function registerDoneHome(host: FacetHost) {
 								...(event ? { ownerAction: event, exactWords: ownerWords(event) } : {}),
 								...(plan ? { scheduledWork: plan.words } : {}),
 							});
+							if (process.env.AW_JUDGE_TRACE === "1")
+								await trace(card, "card read payload", { session, words: output });
+							return output;
 						}
 						case "update": {
 							const { card } = body;
@@ -708,7 +705,6 @@ export function registerDoneHome(host: FacetHost) {
 								payload: "id",
 								words: card,
 								reason,
-								retellings: 0,
 							});
 							return "Home will hand over the card.";
 						}
@@ -741,7 +737,7 @@ export function registerDoneHome(host: FacetHost) {
 							return "Updated the card.";
 						}
 						case "trace": {
-							const { card, step, words, pid } = body;
+							const { card, step, words, pid, tool } = body;
 							if (card && step === "tool called") {
 								await state.change((draft) => {
 									const route = draft.cards[card];
@@ -752,7 +748,7 @@ export function registerDoneHome(host: FacetHost) {
 								}, ctx);
 							}
 							if (roaming) {
-								await trace(card ?? state.value.activeCard, step, { session, words, pid });
+								await trace(card ?? state.value.activeCard, step, { session, words, pid, tool });
 								return "";
 							}
 							const location = Object.keys(state.value.locations).find(
@@ -761,7 +757,7 @@ export function registerDoneHome(host: FacetHost) {
 							if (!location && session !== homeSession(config, state.value)) {
 								throw forbidden("This worker has no Home role.");
 							}
-							await trace(card, step, { session, location: location ?? "Home", words, pid });
+							await trace(card, step, { session, location: location ?? "Home", words, pid, tool });
 							return "";
 						}
 					}

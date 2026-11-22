@@ -55,8 +55,11 @@ export function registerDoneHomeWorker(host: FacetHost) {
 				async (ctx) => expectVariant(await ctx.get(DoneHomeCard, {}), "worker").run(operation, ctx),
 				context,
 			);
-		const log = (step: string, words: string, context: Context, card?: string) =>
-			call({ kind: "trace", step, words, pid: process.pid, ...(card ? { card } : {}) }, context);
+		const log = (step: string, words: string, context: Context, card?: string, tool?: string) =>
+			call(
+				{ kind: "trace", step, words, pid: process.pid, ...(card ? { card } : {}), ...(tool ? { tool } : {}) },
+				context,
+			);
 		const tool = <T extends object>(
 			name: string,
 			description: string,
@@ -140,10 +143,6 @@ export function registerDoneHomeWorker(host: FacetHost) {
 			hooks: [
 				hook(GenerationTask, {
 					async beforeRequest({ messages }, api, context) {
-						if (!worker().init.fake) {
-							await log("model called", "", context);
-							return undefined;
-						}
 						const userIndex = messages.findLastIndex((message) => message.role === "user");
 						const user = messages[userIndex];
 						const turn = user ? messageText(user).replace(/^<sender [^>]+\/>\n/, "") : "";
@@ -153,9 +152,14 @@ export function registerDoneHomeWorker(host: FacetHost) {
 								: undefined;
 						const notice = NOTICE.check(candidate) ? candidate : undefined;
 						const results = messages.slice(userIndex + 1).filter((message) => message.role === "toolResult");
-						const trackedCard =
-							notice?.card ?? (role !== "home" && /^[a-z0-9]{10}$/.test(turn) ? turn : undefined);
-						await log("model called", turn, context, trackedCard);
+						const assignment = role !== "home" && /^[a-z0-9]{10}$/.test(turn) ? turn : undefined;
+						const trackedCard = notice?.card ?? assignment ?? activeCard;
+						const fake = worker().init.fake;
+						await log("model called", fake ? turn : "", context, trackedCard);
+						if (role !== "home" && !assignment && activeCard && turn && results.length === 0) {
+							await log("live input delivered", "", context, activeCard);
+						}
+						if (!fake) return undefined;
 						const models = config.value.get("default")?.models();
 						if (!models || !("setProvider" in models) || typeof models.setProvider !== "function") {
 							throw new Error("The Home judge requires P2's mutable fake model registry.");
@@ -196,22 +200,31 @@ export function registerDoneHomeWorker(host: FacetHost) {
 				}),
 			],
 			wraps:
-				role !== "home"
-					? [
-							{
-								kind: "tool",
-								tool: "bash",
-								wrap: (bash) => ({
-									...bash,
-									async execute(args, api, context) {
-										if (activeCard) await call({ kind: "continue", card: activeCard }, context);
-										await log("tool called", JSON.stringify(args), context, activeCard);
-										return bash.execute(args, api, context);
-									},
-								}),
-							},
-						]
-					: [],
+				role === "home"
+					? []
+					: ["bash", "read", "edit", "write"].map((name) => ({
+							kind: "tool",
+							tool: name,
+							wrap: (original) => ({
+								...original,
+								async execute(args, api, context) {
+									if (name === "bash" && activeCard)
+										await call({ kind: "continue", card: activeCard }, context);
+									const observe = name === "bash" || process.env.AW_JUDGE_TRACE === "1";
+									if (observe)
+										await log(
+											name === "bash" ? "tool called" : "location tool called",
+											JSON.stringify(args),
+											context,
+											activeCard,
+											name,
+										);
+									const result = await original.execute(args, api, context);
+									if (observe) await log("tool ran", "", context, activeCard, name);
+									return result;
+								},
+							}),
+						})),
 		});
 		self.contribute(Extensions, { [extension.name]: extension });
 	});
