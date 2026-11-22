@@ -12,10 +12,19 @@ export type DoneItem = {
 	title: string;
 	origin_text: string | null;
 	created_at: string;
+	created_by: string;
 	status: string;
 	turn: string;
 	blocks: DoneBlock[];
 };
+
+/** A line kept on the card by done. */
+export interface DoneThreadEntry {
+	actor: string;
+	at: string;
+	kind: string;
+	text: string;
+}
 
 export type DoneEvent = {
 	seq: number;
@@ -29,12 +38,14 @@ export type DoneEvent = {
 export class DoneApi {
 	readonly #url: URL;
 	readonly #tokenFile: string;
+	readonly #from: string | undefined;
 
-	constructor(url: string, tokenFile: string) {
+	constructor(url: string, tokenFile: string, from?: string) {
 		this.#url = new URL(url);
 		if (this.#url.protocol !== "http:" || this.#url.hostname !== "127.0.0.1")
 			throw new Error("The prototype's done API must be on loopback");
 		this.#tokenFile = tokenFile;
+		this.#from = from;
 	}
 
 	/** Uses inbox, whose cursor waits for the owner's undo hold. */
@@ -46,12 +57,33 @@ export class DoneApi {
 		await this.#request("/api/inbox/ack", "POST", { seq });
 	}
 
-	async add(title: string) {
-		return (await this.#request<{ item: DoneItem }>("/api/items", "POST", { title, turn: "agent" })).item;
+	async add(title: string, blocks?: DoneBlock[]) {
+		return (
+			await this.#request<{ item: DoneItem }>("/api/items", "POST", {
+				title,
+				turn: "agent",
+				...(blocks ? { blocks } : {}),
+			})
+		).item;
 	}
 
 	async item(card: string) {
-		return (await this.#request<{ item: DoneItem }>(`/api/items/${card}`)).item;
+		return (await this.detail(card)).item;
+	}
+
+	/** Read the current card and its exact thread from done. */
+	async detail(card: string) {
+		return this.#request<{ item: DoneItem; thread: DoneThreadEntry[] }>(`/api/items/${card}`);
+	}
+
+	/** Read a single event already released by the inbox, even after it was acknowledged. */
+	async event(seq: number, card: string) {
+		const { events } = await this.#request<{ events: DoneEvent[] }>(`/api/events?after=${seq - 1}&limit=1`);
+		const event = events[0];
+		if (event?.seq !== seq || event.item_id !== card) {
+			throw new Error(`Done event ${seq} for card ${card} was not found.`);
+		}
+		return event;
 	}
 
 	async patch(card: string, body: object) {
@@ -71,7 +103,11 @@ export class DoneApi {
 		const response = await fetch(new URL(path, this.#url), {
 			method,
 			redirect: "error",
-			headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+			headers: {
+				authorization: `Bearer ${token}`,
+				"content-type": "application/json",
+				...(this.#from ? { "Done-From": this.#from } : {}),
+			},
 			...(body === undefined ? {} : { body: JSON.stringify(body) }),
 			signal: AbortSignal.timeout(5_000),
 		});

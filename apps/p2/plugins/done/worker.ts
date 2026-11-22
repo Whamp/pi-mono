@@ -3,10 +3,12 @@ import { LiveDoc, type TaskId } from "@earendil-works/pi-durable";
 import { contribute, defineFacet, expectVariant, forbidden } from "@p2/app/v1";
 import { Extensions, harnessOf, mainConversation, workerOf } from "@p2/app/v1/worker";
 import { DoneCard, DoneIngress } from "./contract.ts";
+import { registerDoneHomeWorker } from "./done-home-worker.ts";
 import { createDoneScript } from "./done-script.ts";
 import { createDoneTools, DoneAnswer, DoneSessionDoc } from "./done-tools.ts";
 
 export default defineFacet((host) => {
+	registerDoneHomeWorker(host);
 	contribute(host, "p2.done-tools", (self) => {
 		const worker = workerOf(self);
 		const tools = createDoneTools((run, context) =>

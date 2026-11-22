@@ -12,6 +12,7 @@ test("Done location settings preserve defaults and honor environment and folder 
 		const base = { url: "http://127.0.0.1:4910", tokenFile: "/tmp/example-token" };
 		const path = join(dir, "done.json");
 		await writeFile(path, JSON.stringify(base));
+		assert.equal((await loadDoneSettings(dir))?.pattern, "b");
 		assert.deepEqual((await loadDoneSettings(dir))?.locations, {
 			fleet: { env: "fleet", folder: "~/agents-world/fleet" },
 			household: { env: null, folder: join(homedir(), "agents-world/household") },
@@ -25,6 +26,12 @@ test("Done location settings preserve defaults and honor environment and folder 
 		};
 		await writeFile(path, JSON.stringify({ ...base, locations }));
 		assert.deepEqual((await loadDoneSettings(dir))?.locations, locations);
+		for (const pattern of ["b", "d-a", "d-b"]) {
+			await writeFile(path, JSON.stringify({ ...base, pattern }));
+			assert.equal((await loadDoneSettings(dir))?.pattern, pattern);
+		}
+		await writeFile(path, JSON.stringify({ ...base, pattern: "unknown" }));
+		await assert.rejects(loadDoneSettings(dir), /Invalid done.json settings/);
 	} finally {
 		await rm(dir, { recursive: true, force: true });
 	}

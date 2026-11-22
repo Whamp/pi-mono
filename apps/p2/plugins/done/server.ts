@@ -31,6 +31,7 @@ import {
 	WriteCard,
 } from "./contract.ts";
 import { DoneApi, type DoneEvent, putDoneQuestion } from "./done-api.ts";
+import { registerDoneHome } from "./done-home.ts";
 import { isDoneLocation, RoutingQuestion, routeDoneCard } from "./done-routing.ts";
 import { loadDoneSettings } from "./done-settings.ts";
 
@@ -61,6 +62,7 @@ const DoneFollower = local("p2.done-follower", {
 });
 
 export default defineFacet((host) => {
+	registerDoneHome(host);
 	host.serve(DoneFollower, (_params, self) => {
 		const server = self.get(Server, {});
 		const hosts = self.get(Hosts, {});
@@ -299,7 +301,7 @@ export default defineFacet((host) => {
 		};
 
 		self.onLive(async (ctx) => {
-			if (!settings.value) return;
+			if (!settings.value || settings.value.pattern !== "b") return;
 			for (;;) {
 				await arm(ctx);
 				await parkedWorkers(ctx);

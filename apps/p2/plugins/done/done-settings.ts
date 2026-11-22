@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { compile, nul, num, obj, opt, str, union } from "@earendil-works/pi-schema";
-import { record } from "@p2/app/v1";
+import { literal, record } from "@p2/app/v1";
 import { LocationSchema } from "./contract.ts";
 
 const Location = obj({ env: union([str(), nul()]), folder: str() });
@@ -12,6 +12,8 @@ const Settings = compile(
 	obj({
 		url: str(),
 		tokenFile: str(),
+		pattern: opt(union([literal("b"), literal("d-a"), literal("d-b")])),
+		p2Url: opt(str()),
 		locations: opt(obj({ fleet: opt(Location), household: opt(Location), shop: opt(Location) })),
 		scripts: opt(record(str())),
 		schedule: opt(
@@ -41,6 +43,7 @@ export async function loadDoneSettings(dataDir: string) {
 	const { locations, ...settings } = parsed;
 	return {
 		...settings,
+		pattern: settings.pattern ?? "b",
 		locations: {
 			fleet: locations?.fleet ?? { env: "fleet", folder: "~/agents-world/fleet" },
 			household: locations?.household ?? { env: null, folder: join(homedir(), "agents-world/household") },
