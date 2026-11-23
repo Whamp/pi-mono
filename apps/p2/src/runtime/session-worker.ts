@@ -6,6 +6,7 @@ import type { ModelRef } from "@earendil-works/pi-durable";
 import { arr, bool, nul, num, obj, opt, str, union } from "@earendil-works/pi-schema";
 import { param, sessionHost } from "./chord.ts";
 import { LocationSchema } from "./location.ts";
+import type { SessionLock } from "./session-lock.ts";
 
 /** What the server tells a worker it spawns: `session` from the sessions plugin, more keys from other plugins. */
 export type SessionInit = {
@@ -16,6 +17,8 @@ export type SessionInit = {
 	readonly thinkingLevel: ModelThinkingLevel;
 	/** False for an archived session started only to rebuild its search index: Durable work does not resume. */
 	readonly resume?: boolean;
+	/** Initial lock when it defines a worker's filesystem and tool boundary. */
+	readonly lock?: SessionLock;
 };
 export const WorkerBoundary = remote("p2.worker-boundary", {
 	version: 2,

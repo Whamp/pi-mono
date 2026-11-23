@@ -76,14 +76,13 @@ export function createDoneTools(callCard: CallCard) {
 			}),
 		],
 		tools: [
-			{ ...ask, scope: "main", locked: "never" },
-			{ ...timer, scope: "main", locked: "never" },
+			{ ...ask, scope: "main" },
+			{ ...timer, scope: "main" },
 			defineP2Tool({
 				name: "done_write",
 				description: "Write a title and facts on this session's done card.",
 				parameters: WriteCard,
 				scope: "main",
-				locked: "never",
 				async execute(body, _api, context) {
 					await callCard((card, ctx) => card.write(body, ctx), context);
 					return toolText("Wrote the card.");
@@ -94,7 +93,6 @@ export function createDoneTools(callCard: CallCard) {
 				description: "Add a comment to this session's done card.",
 				parameters: obj({ text: str() }),
 				scope: "main",
-				locked: "never",
 				async execute(body, _api, context) {
 					await callCard((card, ctx) => card.comment(body, ctx), context);
 					return toolText("Added the comment.");
@@ -105,7 +103,6 @@ export function createDoneTools(callCard: CallCard) {
 				description: "Complete this session's done card with what you did and how you checked.",
 				parameters: CompleteCard,
 				scope: "main",
-				locked: "never",
 				async execute(body, _api, context) {
 					await callCard((card, ctx) => card.complete(body, ctx), context);
 					return toolText("Completed the card.");

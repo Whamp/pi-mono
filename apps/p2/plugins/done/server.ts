@@ -18,7 +18,7 @@ import {
 	withAbortSignal,
 } from "@p2/app/v1";
 import { Hosts, Server, serverOf } from "@p2/app/v1/server";
-import { SessionOperations } from "../sessions/contract.ts";
+import { SessionLocks, SessionOperations } from "../sessions/contract.ts";
 import {
 	CardLink,
 	CommentCard,
@@ -34,6 +34,7 @@ import {
 } from "./contract.ts";
 import { DoneApi, type DoneEvent, pollDoneCopies, putDoneQuestion } from "./done-api.ts";
 import { registerDoneHome } from "./done-home.ts";
+import { lockDoneSession } from "./done-reach.ts";
 import { isDoneLocation, RoutingQuestion, routeDoneCard } from "./done-routing.ts";
 import {
 	type DoneCopySettings,
@@ -96,6 +97,7 @@ export default defineFacet((host) => {
 		const hosts = self.get(Hosts, {});
 		const natives = serverOf(self);
 		const sessions = self.get(SessionOperations, {});
+		const locks = self.get(SessionLocks, {});
 		const saved = self.state(STATE);
 		const epoch = crypto.randomUUID();
 		const generations = new Map<string, number>();
@@ -213,6 +215,7 @@ export default defineFacet((host) => {
 				const id = await begin(card, ctx, input.until);
 				const bounded = withAbortSignal(AbortSignal.timeout(config.workTimeoutMs), ctx);
 				try {
+					await lockDoneSession(locks, config, link.session, link.location, ctx);
 					await sessions.create(
 						{ id: link.session, title: `${donePatternMark(config.pattern)} · ${title}`, env, cwd: folder },
 						bounded,
@@ -340,6 +343,7 @@ export default defineFacet((host) => {
 			const arm = async (ctx: Ctx) => {
 				const schedule = config.schedule;
 				if (!schedule) return;
+				if (schedule.armAt !== undefined && Date.now() < schedule.armAt) return;
 				let run = state.value.scheduled[schedule.id];
 				if (run?.armed) return;
 				if (!run) {

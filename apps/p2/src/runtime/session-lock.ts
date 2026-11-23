@@ -2,7 +2,8 @@
 // its owner picked, and everyone who can send it input may use all of them. Kept by the sessions plugin on the server
 // (`SessionLocks`), mirrored into the session's Durable state by its worker, where the tool guard, the prompt and MCP
 // placement read it.
-import { arr, bool, obj, type Static, str, union } from "@earendil-works/pi-schema";
+import { arr, bool, obj, opt, type Static, str, union } from "@earendil-works/pi-schema";
+import { LocationSchema } from "./location.ts";
 import { literal } from "./schema.ts";
 
 /** Capabilities a locked session may get besides MCP servers and instructions. */
@@ -17,5 +18,7 @@ export const SessionLockSchema = obj({
 	/** The global AGENTS.md, skills and prompt templates. */
 	instructions: bool(),
 	capabilities: arr(union([literal("ports"), literal("conversations")]), { maxItems: 8 }),
+	/** A startup boundary. An empty location list gives a dispatcher an empty work directory. */
+	confinement: opt(obj({ tools: arr(str()), locations: arr(LocationSchema) })),
 });
 export type SessionLock = Static<typeof SessionLockSchema>;

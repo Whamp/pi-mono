@@ -71,7 +71,6 @@ export function registerDoneHomeWorker(host: FacetHost) {
 				description,
 				parameters,
 				scope: "main",
-				locked: "never",
 				executionMode: "sequential",
 				async execute(args, _api, context) {
 					const request = operation(args);
@@ -220,7 +219,14 @@ export function registerDoneHomeWorker(host: FacetHost) {
 											name,
 										);
 									const result = await original.execute(args, api, context);
-									if (observe) await log("tool ran", "", context, activeCard, name);
+									if (observe && result.kind === undefined)
+										await log(
+											"tool ran",
+											JSON.stringify(result.output ?? api.retainedOutput().text),
+											context,
+											activeCard,
+											name,
+										);
 									return result;
 								},
 							}),

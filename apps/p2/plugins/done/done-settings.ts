@@ -1,12 +1,12 @@
 // Local configuration for the prototype. An optional scheduled run arms one Durable sleep.
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
-import { arr, compile, nul, num, obj, opt, type Static, str, union } from "@earendil-works/pi-schema";
+import { isAbsolute, join, normalize } from "node:path";
+import { arr, bool, compile, nul, num, obj, opt, type Static, str, union } from "@earendil-works/pi-schema";
 import { literal, record } from "@p2/app/v1";
 import { LocationSchema } from "./contract.ts";
 
-const Location = obj({ env: union([str(), nul()]), folder: str() });
+const Location = obj({ env: union([str(), nul()]), folder: str(), reach: opt(arr(LocationSchema)) });
 
 const CopySettings = obj({
 	id: opt(str({ pattern: "^[a-z0-9][a-z0-9-]*$" })),
@@ -15,6 +15,7 @@ const CopySettings = obj({
 	pattern: opt(union([literal("b"), literal("c"), literal("d-a"), literal("d-b")])),
 	p2Url: opt(str()),
 	workTimeoutMs: opt(num({ minimum: 1 })),
+	confine: opt(bool()),
 	locations: opt(obj({ fleet: opt(Location), household: opt(Location), shop: opt(Location) })),
 	scripts: opt(record(str())),
 	schedule: opt(
@@ -24,6 +25,7 @@ const CopySettings = obj({
 			location: LocationSchema,
 			words: str(),
 			at: num(),
+			armAt: opt(num()),
 			script: opt(str()),
 		}),
 	),
@@ -31,16 +33,25 @@ const CopySettings = obj({
 const Settings = compile(union([CopySettings, arr(CopySettings)]));
 
 function doneCopySettings({ id, locations, ...settings }: Static<typeof CopySettings>, key: string) {
+	const configured = {
+		fleet: locations?.fleet ?? { env: "fleet", folder: "~/agents-world/fleet" },
+		household: locations?.household ?? { env: null, folder: join(homedir(), "agents-world/household") },
+		shop: locations?.shop ?? { env: null, folder: join(homedir(), "agents-world/shop") },
+	};
+	if (
+		settings.confine &&
+		Object.values(configured).some(
+			({ folder }) => !isAbsolute(folder) || normalize(folder) !== folder || folder === "/",
+		)
+	) {
+		throw new Error("Confined done locations need absolute, normalized folder paths.");
+	}
 	return {
 		...settings,
 		id: id ?? key,
 		pattern: settings.pattern ?? "b",
 		workTimeoutMs: settings.workTimeoutMs ?? 30_000,
-		locations: {
-			fleet: locations?.fleet ?? { env: "fleet", folder: "~/agents-world/fleet" },
-			household: locations?.household ?? { env: null, folder: join(homedir(), "agents-world/household") },
-			shop: locations?.shop ?? { env: null, folder: join(homedir(), "agents-world/shop") },
-		},
+		locations: configured,
 	};
 }
 

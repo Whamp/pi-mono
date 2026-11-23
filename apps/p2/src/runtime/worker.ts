@@ -9,6 +9,7 @@ import type { Watchable, WatchCall, WatchHandle } from "@earendil-works/chord/wa
 import type { Api, AssistantMessage, Message, Model } from "@earendil-works/pi-ai";
 import type { Models, ModelsSimpleStreamOptions } from "@earendil-works/pi-ai/models";
 import {
+	AgentDoc,
 	type ConversationId,
 	configure,
 	type DocumentReader,
@@ -36,6 +37,7 @@ import { durableContext, durableRegistry, ExtensionSwitches, Extensions } from "
 import { hostFiles, sessionDirectory } from "./host-dirs.ts";
 import { isRooted, type Location, type LocationInput, sameLocation } from "./location.ts";
 import { topLevelConversations } from "./main-conversation.ts";
+import { SessionLockDoc } from "./session-lock-doc.ts";
 import { durableStorage } from "./session-store.ts";
 import { type SessionInit, WorkerBoundary } from "./session-worker.ts";
 
@@ -181,6 +183,8 @@ export type Machine = { at: (cwd: string) => ExecutionEnv; close: () => void };
 export type HarnessEnvironmentEntry = {
 	/** The machine of the remote environment `env`. Connecting may wait for its first operation. */
 	open: (env: string) => Promise<Machine>;
+	/** A daemon confined to one location, or an empty filesystem for a dispatcher. */
+	confine?: (location: Location, signal: AbortSignal) => Promise<Machine>;
 	/** Where environment `env`'s tools run, for the prompt's `cwd` section, e.g. `the SSH host gpu-box`. */
 	readonly describe?: (env: string) => Promise<string | undefined>;
 	/**
@@ -550,7 +554,8 @@ export async function conversationEnvironment(
  */
 class Execution implements ExecutionEnvironments {
 	#session: Location;
-	readonly #open: (env: string | null, signal: AbortSignal) => Promise<Machine>;
+	readonly #open: (location: Location, signal: AbortSignal) => Promise<Machine>;
+	readonly #key: (location: Location) => string;
 	readonly #sandbox: (env: string, signal: AbortSignal) => Promise<boolean>;
 	readonly #own: (
 		read: DocumentReader | undefined,
@@ -565,14 +570,16 @@ class Execution implements ExecutionEnvironments {
 	readonly #closing = new AbortController();
 	constructor(
 		session: Location,
-		open: (env: string | null, signal: AbortSignal) => Promise<Machine>,
+		open: (location: Location, signal: AbortSignal) => Promise<Machine>,
 		sandbox: (env: string, signal: AbortSignal) => Promise<boolean>,
 		own: (read: DocumentReader | undefined, id: ConversationId, context: Context) => Promise<Location | undefined>,
+		key: (location: Location) => string = ({ env }) => env ?? "",
 	) {
 		this.#session = session;
 		this.#open = open;
 		this.#sandbox = sandbox;
 		this.#own = own;
+		this.#key = key;
 	}
 	async sandbox(env: string | null): Promise<string | undefined> {
 		if (env === null) return undefined;
@@ -587,11 +594,11 @@ class Execution implements ExecutionEnvironments {
 	}
 	async at(location: Location): Promise<ExecutionEnv> {
 		if (this.#closing.signal.aborted) throw new Error("The session's environments are closed");
-		const key = location.env ?? "";
+		const key = this.#key(location);
 		let entry = this.#machines.get(key);
 		if (!entry) {
 			const created = {
-				machine: this.#open(location.env, this.#closing.signal),
+				machine: this.#open(location, this.#closing.signal),
 				envs: new Map<string, ExecutionEnv>(),
 			};
 			entry = created;
@@ -623,7 +630,7 @@ class Execution implements ExecutionEnvironments {
 		const ending: ExecutionEnv[] = [];
 		const closing: Promise<Machine>[] = [];
 		for (const [key, entry] of this.#machines) {
-			const kept = used.filter((location) => (location.env ?? "") === key);
+			const kept = used.filter((location) => this.#key(location) === key);
 			for (const [cwd, env] of entry.envs)
 				if (!kept.some((location) => location.cwd === cwd)) {
 					entry.envs.delete(cwd);
@@ -721,7 +728,18 @@ function openHarness(
 		},
 	});
 	/** A machine: this one, or a remote environment's from the plugin providing them. */
-	const open = async (env: string | null, signal: AbortSignal): Promise<Machine> => {
+	const confinement = session.lock?.confinement;
+	const open = async (location: Location, signal: AbortSignal): Promise<Machine> => {
+		const { env, cwd } = location;
+		if (confinement) {
+			const allowed = confinement.locations.length
+				? confinement.locations.some((folder) => sameLocation(folder, location))
+				: env === null && cwd === "/";
+			if (!allowed) throw new Error("Session lock does not allow this location.");
+			const boundary = (await whenPresent(environments, "remote", signal)).confine;
+			if (!boundary) throw new Error("Session lock requires a confined environment.");
+			return boundary(location, signal);
+		}
 		if (env === null) return localMachine();
 		const remote = await whenPresent(environments, "remote", signal);
 		return remote.open(env);
@@ -734,11 +752,17 @@ function openHarness(
 	let reader: DocumentReader | undefined;
 	const execution: Native<Execution> = self.open(
 		async () => {
-			const created = new Execution(location.value, open, sandbox, async (read, id, context) => {
-				const documents = read ?? reader;
-				if (!documents) throw new Error("The session's Harness is not open");
-				return placements.value.get("subagents")?.own(documents, id, context);
-			});
+			const created = new Execution(
+				location.value,
+				open,
+				sandbox,
+				async (read, id, context) => {
+					const documents = read ?? reader;
+					if (!documents) throw new Error("The session's Harness is not open");
+					return placements.value.get("subagents")?.own(documents, id, context);
+				},
+				confinement ? ({ env, cwd }) => JSON.stringify([env, cwd]) : undefined,
+			);
 			try {
 				await created.at(location.value);
 			} catch (error) {
@@ -761,7 +785,12 @@ function openHarness(
 				{
 					models,
 					...(telemetry === undefined ? {} : { telemetry }),
-					registry: durableRegistry(extensions, switches, durableContext(observing.signal)),
+					registry: durableRegistry(
+						extensions,
+						switches,
+						durableContext(observing.signal),
+						confinement && new Set(confinement.tools),
+					),
 					settings,
 					// The conversation's location, not its agent cwd alone: a subagent's own may be on another machine.
 					env: async (target, context) =>
@@ -775,6 +804,14 @@ function openHarness(
 			const root = await harness.root(ctx, {
 				agent: { model: session.model, cwd, thinkingLevel: session.thinkingLevel },
 			});
+			if (session.lock && confinement) {
+				await harness.commit(async (tx) => {
+					(await tx.doc(SessionLockDoc)).lock = structuredClone(session.lock ?? null);
+					const agent = await tx.doc(AgentDoc, ROOT_CONVERSATION_ID);
+					agent.tools = [...confinement.tools];
+					agent.modelTools = [...confinement.tools];
+				}, ctx);
+			}
 			const agent = await root.agent(ctx);
 			// Before the Harness is live: nothing can run or resume in a stale cwd first.
 			try {

@@ -43,6 +43,7 @@ export function durableRegistry(
 	extensions: RegistryValue<ReadonlyMap<string, Extension<P2Tool>>>,
 	switches: RegistryValue<ReadonlyMap<string, boolean | undefined>>,
 	context: Context,
+	toolAllowlist?: ReadonlySet<string>,
 ): RegistryReader {
 	const snapshots = new WeakMap<ReadonlyMap<string, Extension<P2Tool>>, Map<string, RegistrySnapshot>>();
 	const snapshotOf = (
@@ -55,15 +56,26 @@ export function durableRegistry(
 		let snapshot = byKey.get(key);
 		if (snapshot === undefined) {
 			const builder = createRegistry<P2Tool>();
-			const installed = [...table].filter(([name]) => !disabled.has(name)).map(([, extension]) => extension);
+			const installed = [...table]
+				.filter(([name]) => !disabled.has(name) && (!toolAllowlist || name !== CODEMODE_EXTENSION))
+				.map(([, extension]) => extension);
 			for (const extension of installed)
-				builder.install(extension.tools ? { ...extension, tools: extension.tools.map(guardTool) } : extension);
+				builder.install(
+					extension.tools
+						? {
+								...extension,
+								tools: extension.tools
+									.filter((tool) => !toolAllowlist || toolAllowlist.has(tool.name))
+									.map(guardTool),
+							}
+						: extension,
+				);
 			const codemode = table.has(CODEMODE_EXTENSION) && !disabled.has(CODEMODE_EXTENSION);
 			const search = createToolSearchExtension();
 			const deferred = installed.some((extension) =>
 				extension.tools?.some((tool) => tool.deferred && (tool.callers?.includes("model") ?? true)),
 			);
-			if (!codemode && deferred && !table.has(search.name)) builder.install(search);
+			if (!toolAllowlist && !codemode && deferred && !table.has(search.name)) builder.install(search);
 			snapshot = builder.snapshot();
 			byKey.set(key, snapshot);
 		}

@@ -1,8 +1,9 @@
 import { pluginFile } from "@earendil-works/chord/plugins";
 import { contribute, defineFacet } from "@p2/app/v1";
 import { HarnessEnvironments, workerOf } from "@p2/app/v1/worker";
+import { openBubblewrapLocation } from "./bubblewrap-location.ts";
 import { isSandbox, loadEnvs } from "./config.ts";
-import { remoteSession } from "./remote-env.ts";
+import { remoteSession, sshOptions } from "./remote-env.ts";
 import { EnvStore } from "./store.ts";
 
 export default defineFacet((host) => {
@@ -19,6 +20,20 @@ export default defineFacet((host) => {
 		);
 		self.contribute(HarnessEnvironments, {
 			remote: {
+				confine: async (location, signal) => {
+					const { env } = location;
+					if (env === null) return openBubblewrapLocation(location, undefined, signal);
+					const { dataDir } = worker().init;
+					const configs = await loadEnvs(dataDir);
+					const config = Object.hasOwn(configs, env) ? configs[env] : undefined;
+					if (config?.type !== "ssh") throw new Error("Bubblewrap confinement requires an SSH environment.");
+					// The fixture judge substitutes ssh on PATH for its ordinary environment. This daemon is already isolated.
+					return openBubblewrapLocation(
+						location,
+						{ ...sshOptions(dataDir, env, config), ssh: "/usr/bin/ssh" },
+						signal,
+					);
+				},
 				open: async (env) => {
 					const { dataDir } = worker().init;
 					const configs = await loadEnvs(dataDir);

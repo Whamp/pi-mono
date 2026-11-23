@@ -16,7 +16,7 @@ import {
 } from "@p2/app/v1";
 import { Hosts, Server, serverOf, WorkerInitValues } from "@p2/app/v1/server";
 import { FamiliarStore } from "../familiar/contract.ts";
-import { SessionMoves, SessionOperations } from "../sessions/contract.ts";
+import { SessionLocks, SessionMoves, SessionOperations } from "../sessions/contract.ts";
 import type { DoneLocation } from "./contract.ts";
 import { DoneApi, type DoneBlock, type DoneEvent, pollDoneCopies, putDoneQuestion } from "./done-api.ts";
 import {
@@ -29,6 +29,7 @@ import {
 } from "./done-home-contract.ts";
 import { publishHomeUpdate } from "./done-home-publication.ts";
 import { type DoneHomeCopy, enqueueDispatch, HomeState, initialDoneHomeCopy } from "./done-home-state.ts";
+import { lockDoneSession } from "./done-reach.ts";
 import { isDoneLocation, RoutingQuestion, routeDoneCard } from "./done-routing.ts";
 import {
 	type DoneCopySettings,
@@ -72,6 +73,7 @@ export function registerDoneHome(host: FacetHost) {
 		const natives = serverOf(self);
 		const familiar = self.get(FamiliarStore, {});
 		const sessions = self.get(SessionOperations, {});
+		const locks = self.get(SessionLocks, {});
 		const moves = self.get(SessionMoves, {});
 		const saved = self.state(HomeState);
 		const epoch = crypto.randomUUID();
@@ -126,8 +128,13 @@ export function registerDoneHome(host: FacetHost) {
 						draft.mainSession = id;
 					}, ctx);
 				}
+				await lockDoneSession(locks, config, id, "home", ctx);
 				const row = await sessions.create(
-					{ id, title: `${donePatternMark(config.pattern)} · Home`, cwd: server.info.value.dataDir },
+					{
+						id,
+						title: `${donePatternMark(config.pattern)} · Home`,
+						cwd: config.confine ? "/" : server.info.value.dataDir,
+					},
 					ctx,
 				);
 				if (row.archivedAt !== null) await sessions.restore({ id }, ctx);
@@ -263,6 +270,7 @@ export function registerDoneHome(host: FacetHost) {
 				const { env, folder } = config.locations[location];
 				const bounded = withAbortSignal(AbortSignal.timeout(config.workTimeoutMs), ctx);
 				const label = roaming ? "Done" : location;
+				await lockDoneSession(locks, config, session, location, ctx);
 				await sessions.create(
 					{ id: session, title: `${donePatternMark(config.pattern)} · ${label}`, env, cwd: folder },
 					bounded,
@@ -679,6 +687,11 @@ export function registerDoneHome(host: FacetHost) {
 						case "transfer": {
 							const { card, location, reason } = body;
 							const link = requireLocation(session, card);
+							const reach = config.locations[link.location].reach;
+							if ((config.confine || reach) && !reach?.includes(location)) {
+								await trace(card, "location transfer denied", { from: link.location, to: location });
+								throw forbidden("The done copy does not allow this destination from the current location.");
+							}
 							if (roaming) {
 								if (link.location === location || movePending(card))
 									throw forbidden("This card is already there or has a move pending.");

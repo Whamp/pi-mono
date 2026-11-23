@@ -58,6 +58,7 @@ import {
 	SessionArchived,
 	SessionCopied,
 	SessionIndex,
+	SessionLocks,
 	SessionMoves,
 	SessionOperations,
 	Sessions,
@@ -366,6 +367,7 @@ export default defineFacet((host) => {
 
 	host.serve(SessionOperations, (_params, self) => {
 		const catalog = self.get(Catalog, {});
+		const locks = self.get(SessionLocks, {});
 		const server = self.get(Server, {});
 		const natives = serverOf(self);
 		const envService = self.get(EnvService, {});
@@ -642,6 +644,7 @@ export default defineFacet((host) => {
 		});
 		const startData = async (id: string, context: Context): Promise<SessionInit> => {
 			const session = await catalog.get({ id }, context);
+			const lock = locks.locks.value[id];
 			// An archived session starts only to rebuild its index, and then without resuming its work.
 			const indexing = session.archivedAt !== null && archivedStarts.allowed.value.includes(id);
 			if (session.archivedAt !== null && !indexing) throw forbidden("Session is archived");
@@ -653,6 +656,7 @@ export default defineFacet((host) => {
 				env: session.env ?? null,
 				model: session.model,
 				thinkingLevel: session.thinkingLevel as SessionInit["thinkingLevel"],
+				...(lock?.confinement ? { lock } : {}),
 				...(indexing ? { resume: false } : {}),
 			};
 		};

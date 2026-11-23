@@ -365,13 +365,14 @@ export default defineFacet((host) => {
 		const extension = defineExtension({
 			name: "p2-prompt",
 			sections: [
-				section("app", async (input, context) =>
-					appGuide(
+				section("app", async (input, context) => {
+					if ((await sessionLock(input.read, context))?.confinement) return undefined;
+					return appGuide(
 						worker().init.app,
 						worker().init.dataDir,
 						(await harness().environments.locate(input.conversationId, context, input.read)).env,
-					),
-				),
+					);
+				}),
 				section("agents-md", async (input, context) => (await visible(input, context)).agents || undefined, {
 					tag: false,
 				}),
